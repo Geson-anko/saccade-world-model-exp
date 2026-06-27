@@ -37,10 +37,13 @@
 
 ## 技術スタック / 開発
 
-- Python `>= 3.12`、パッケージ管理は **uv**。
-- 実行: `uv run <script>` / 依存追加: `uv add <pkg>`。
-- 現状は初期化直後（依存なし、`main.py` はひな形）。学習基盤の実装はこれから。
+- Python `>= 3.12`（`.python-version` は 3.13）、パッケージ管理は **uv**。**配布物ではない**ため `tool.uv.package = false`（ビルドしない）。
+- 開発は **devcontainer（docker-compose・NVIDIA GPU）** 上で行う（VS Code "Reopen in Container"）。
+- モジュール系ソースは **フラットな `exp/`**（src-layout にしない）。学習・評価のエントリーポイントは `scripts/` かリポジトリルート。
+- コマンドは **just** に集約: `just setup` / `format` / `lint` / `type` / `test` / `run`。依存追加は `uv add <pkg>`、任意実行は `uv run <cmd>`。
+- 品質ゲートは **ローカルの `just run`**（format → test → type）。**GitHub CI は持たない**（配布物でないため）。lint/format は pre-commit に集約（ruff ほか）。
+- **torch / ML 依存は未確定**。採用が決まるまでランタイム依存は追加しない。開発フローの詳細は `.claude/skills/dev-workflow` を参照。
 
 ## 現状
 
-ごく初期。設計は README に確定済み。次の一手はサッカード機構（パディング → 切り取り → リサイズ）とデータローダの実装（README のロードマップ参照）。
+開発基盤を整備済み（devcontainer・uv・ruff/pyright/pytest・pre-commit・just・`.claude` 設定・`memory/`）。ソース実装はこれから。次の一手はサッカード機構（パディング → 切り取り → リサイズ）とデータローダの実装（README のロードマップ参照）。

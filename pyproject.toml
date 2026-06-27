@@ -1,7 +1,96 @@
 [project]
 name = "saccade-world-model-exp"
 version = "0.1.0"
-description = "Add your description here"
+description = "In-context autoregressive latent world model over saccadic image glimpses (experiment)"
 readme = "README.md"
 requires-python = ">=3.13"
+# ランタイム依存はまだ確定していない (torch を採用するかは未決定)。
+# 採用が決まった時点で `uv add <pkg>` で追加する。
 dependencies = []
+
+[dependency-groups]
+# 開発ツールのみ。GitHub CI は持たず、ローカルゲート (`just run`) で品質を担保する。
+dev = [
+  "pre-commit>=4.0",
+  "pyright>=1.1.398",
+  "pytest>=8.3",
+  "ruff>=0.8",
+]
+
+[tool.uv]
+# 配布物ではない研究コード。ビルド/インストールはせず仮想環境に依存だけ入れる。
+# `exp` の import はテストの `pythonpath = "."` 経由で解決する。
+package = false
+
+[tool.pytest.ini_options]
+addopts = [
+  "--color=yes",
+  "--strict-markers",
+]
+testpaths = "tests"
+# リポジトリルートを sys.path に載せ、`import exp` を解決させる。
+pythonpath = "."
+filterwarnings = [
+  "ignore::DeprecationWarning",
+  "ignore::UserWarning",
+]
+
+[tool.pyright]
+pythonVersion = "3.13"
+include = ["exp", "tests"]
+exclude = [
+  "**/__pycache__",
+  "**/.venv",
+  ".venv",
+]
+# 数値計算コードの摩擦を避けるため当面は standard。将来 strict = ["exp/"] に上げ可。
+typeCheckingMode = "standard"
+reportMissingTypeStubs = false
+
+[tool.ruff]
+# Same as Black.
+line-length = 88
+indent-width = 4
+
+target-version = "py313"
+
+include = ["*.py"]
+
+exclude = [
+  ".git",
+  ".ipynb_checkpoints",
+  ".pytest_cache",
+  ".ruff_cache",
+  ".venv",
+  ".vscode",
+  "build",
+  "dist",
+  "node_modules",
+]
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "W",
+  "I",
+]
+
+ignore = [
+  "E203", # Whitespace before ':'
+  "E402", # Module level import not at top of file
+  "E501", # Line too long
+  "F811", # Redefinition of unused name
+  "E741", # Ambiguous variable name
+  "E266", # Too many leading '#' for block comment
+  "F401", # Module imported but unused
+]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

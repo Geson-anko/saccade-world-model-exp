@@ -1,0 +1,60 @@
+# Docker Compose 開発環境定義 (devcontainer の裏で動く dev サービス)。
+#
+# - .devcontainer/devcontainer.json がこの compose を参照する。
+# - host repo を /workspace に rw bind する。dev ユーザーの UID/GID を host と
+#   一致させているため、container 内で生成した成果物は host から所有権そのまま見える。
+# - build-arg の ${HOST_UID} / ${HOST_GID} は .devcontainer/initialize.sh が
+#   `id -u` / `id -g` から .devcontainer/.env に冪等 upsert する。compose 方式の
+#   devcontainer では updateRemoteUserUID が効かないため build-arg 経由で揃える。
+# - GPU: nvidia-container-toolkit が host ドライバを inject する。下の device 予約で
+#   全 GPU (RTX 4090 + 4060) を公開する。特定 GPU に固定したい場合は `count: all` を
+#   `device_ids: ["0"]` に変更するか、実行時に CUDA_VISIBLE_DEVICES を指定する。
+
+name: saccade-world-model-exp
+
+services:
+  dev:
+    build:
+      # compose が .devcontainer/ にあるため build context は同ディレクトリで足りる
+      # (Dockerfile は repo ファイルを COPY しない)。
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USER_UID: ${HOST_UID:-1000}
+        USER_GID: ${HOST_GID:-1000}
+    image: saccade-world-model-exp-dev
+    container_name: saccade-world-model-exp-dev
+    hostname: saccade-world-model-exp-dev
+    working_dir: /workspace
+    command: ["sleep", "infinity"]
+    init: true
+    stdin_open: true
+    tty: true
+    environment:
+      # nvidia-smi (utility) と CUDA (compute) の両方を使えるようにする。
+      NVIDIA_DRIVER_CAPABILITIES: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ../:/workspace
+      # uv / pre-commit の既定キャッシュパスに named volume をマウント (再ビルド跨ぎで永続)。
+      - cache-uv:/home/dev/.cache/uv
+      - cache-precommit:/home/dev/.cache/pre-commit
+      # Claude Code の state と gh の認証情報をビルド跨ぎで保持する。
+      - cache-claude:/home/dev/.claude
+      - cache-gh:/home/dev/.config/gh
+
+volumes:
+  cache-uv:
+    name: saccade-world-model-exp-cache-uv
+  cache-precommit:
+    name: saccade-world-model-exp-cache-precommit
+  cache-claude:
+    name: saccade-world-model-exp-cache-claude
+  cache-gh:
+    name: saccade-world-model-exp-cache-gh

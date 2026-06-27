@@ -1,0 +1,28 @@
+{
+  // saccade-world-model-exp 開発環境 (compose ベース)。
+  "name": "saccade-world-model-exp",
+  "dockerComposeFile": ["compose.yml"],
+  "service": "dev",
+  "workspaceFolder": "/workspace",
+  "remoteUser": "dev",
+  // compose の command (sleep infinity) を尊重する。
+  "overrideCommand": false,
+  // host 側で host uid/gid を .devcontainer/.env に upsert する (compose の build-arg が読む)。
+  "initializeCommand": "bash .devcontainer/initialize.sh",
+  // 依存解決 (uv sync) + pre-commit hook 登録 + コンテナ用 Claude 設定の有効化。
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "tamasfe.even-better-toml",
+        "ms-azuretools.vscode-docker",
+        "nefrob.vscode-just-syntax",
+        "redhat.vscode-yaml"
+      ]
+    }
+  }
+}
