@@ -12,7 +12,8 @@
 
 ## feedback（規約・ガイドライン）
 
-<!-- 確定した進め方・規約をここに 1 行で。 -->
+- [attrs + torch eq](attrs-tensor-eq.md) — Tensor を持つ attrs クラスは eq=False 必須 (自動 __eq__ が壊れる)
+- [docformatter 日本語](docformatter-japanese.md) — 日本語 docstring は日本語始まり・短文で書く (capitalize / 途中改行を回避)
 
 ## project（実装上の固有事情）
 
