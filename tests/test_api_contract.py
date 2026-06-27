@@ -1,0 +1,30 @@
+"""Public API contract pins for the ``exp`` package.
+
+IMPORTANT: every test in this file is a *contract pin*, NOT a behaviour
+test. Public names, base classes, and type aliases re-exported from
+``exp`` are depended on by external callers, so we fix them deliberately
+to catch accidental renames / removals (Hyrum's law mitigation). These
+would otherwise count as tautological tests and live nowhere else.
+"""
+
+import pytest
+
+import exp
+
+
+@pytest.mark.api_contract
+def test_exp_exports():
+    # Contract pin (not a behaviour test): the public export surface of `exp`
+    # is exactly these three symbols, and each is actually present.
+    expected = {"DeviceLike", "DeviceTransferMixin", "Image"}
+
+    assert set(exp.__all__) == expected
+    for name in expected:
+        assert hasattr(exp, name)
+
+
+@pytest.mark.api_contract
+def test_image_is_device_transfer_mixin():
+    # Contract pin (not a behaviour test): Image's public base-class
+    # relationship is part of the API surface external code may rely on.
+    assert issubclass(exp.Image, exp.DeviceTransferMixin)
