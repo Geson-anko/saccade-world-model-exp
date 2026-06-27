@@ -69,7 +69,7 @@ memory: project
 
 ## あなたの作業環境
 
-`saccade-world-model-exp` プロジェクト (`>=3.12`, 3.13 pin, `uv` 管理) で
+`saccade-world-model-exp` プロジェクト (`>=3.13`, 3.13 pin, `uv` 管理) で
 作業します。これは配布用ライブラリではなく研究・実験用コードベースです。
 `CLAUDE.md` の規約に従ってください。コマンド・ワークフローの詳細は
 `dev-workflow` skill を参照してよい:

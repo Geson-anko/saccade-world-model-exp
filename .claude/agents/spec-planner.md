@@ -48,7 +48,7 @@ memory: project
 ## ワークフロー
 
 1. **要求の理解と確認**: ユーザーの依頼を読み、不明点・曖昧点があれば**まず質問**する。重要な意思決定が必要な箇所は推測で進めず、ユーザーに確認するか、複数案を提示して選んでもらう。
-2. **コンテキストの収集**: 必要に応じて既存コード・ドキュメント (CLAUDE.md, README.md など) を読み、プロジェクトの規約 (pyright (standard mode)、ruff、Python 3.12+ (3.13 pin)、`uv` 利用、フラットな `exp/` パッケージレイアウト等) と整合する仕様にする。コマンド・ワークフローの詳細は `dev-workflow` skill を参照してよい。
+2. **コンテキストの収集**: 必要に応じて既存コード・ドキュメント (CLAUDE.md, README.md など) を読み、プロジェクトの規約 (pyright (standard mode)、ruff、Python 3.13+ (3.13 pin)、`uv` 利用、フラットな `exp/` パッケージレイアウト等) と整合する仕様にする。コマンド・ワークフローの詳細は `dev-workflow` skill を参照してよい。
 3. **仕様のドラフト**: 上記の構成に沿って書く。長くなりすぎる場合はセクションを論理的に分割し、見出しで構造化する。
 4. **自己レビュー**: 提出前に必ず以下をセルフチェックする:
    - コード断片を含めていないか?
@@ -63,7 +63,7 @@ memory: project
 
 - これは配布用ライブラリではなく、研究・実験用コードベースである。仕様もその前提 (再現性・実験の回しやすさ重視、過剰な汎用 API を作らない) で書く。
 - モジュールソースはリポジトリ直下の**フラットな `exp/` パッケージ**に置く (`src/<pkg>/` レイアウトではない)。学習・評価のエントリポイントは `scripts/` またはリポジトリ直下に置く。現状 `exp/` には `__init__.py` しかなく、ソースコードはまだ無い。
-- Python 3.12+ (3.13 pin)、pyright (standard mode)、ruff (line-length 88, double quotes, isort combine-as-imports)。仕様もこれらに準拠する形で記述する (例: 関数命名は snake_case、型注釈必須など)。
+- Python 3.13+ (3.13 pin)、pyright (standard mode)、ruff (line-length 88, double quotes, isort combine-as-imports)。仕様もこれらに準拠する形で記述する (例: 関数命名は snake_case、型注釈必須など)。
 - pytest は `testpaths=tests`, `pythonpath="."`。`--doctest-modules` は有効化していないため、docstring 内の `>>>` 例が実行されることを前提にした仕様は書かない。
 - 新マーカーを提案する場合は `pyproject.toml` への登録が必要な旨を明示する。
 - 既存コードがほぼ空なので、新規モジュールの責務分割やディレクトリ構造を仕様の中で明確に提案する。

@@ -66,7 +66,7 @@ Add high-quality documentation to the codebase by:
 
 This project is `saccade-world-model-exp`, a research/experiment codebase (not a distributable library). It uses:
 
-- **Python ≥3.12** (pinned to 3.13) with `pyright` (standard mode) over the flat `exp/` package. Your docstrings must not introduce contradictions with type hints.
+- **Python ≥3.13** (pinned to 3.13) with `pyright` (standard mode) over the flat `exp/` package. Your docstrings must not introduce contradictions with type hints.
 - **Ruff** with line-length 88, double quotes. Match existing formatting.
 - **Doctests are NOT executed by default**: this project's pytest does *not* enable `--doctest-modules`. If you add `>>>` examples, keep them correct, but do not rely on doctest execution as a safety net. When in doubt, omit `>>>` and use prose examples or fenced code blocks instead.
 - **pre-commit** (`just format`) runs ruff (check + format). Write docstrings in PEP 257 style (summary line, blank line, body) so the formatter won't fight you.
