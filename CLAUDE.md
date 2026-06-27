@@ -67,7 +67,7 @@
 - モジュール系ソースは **フラットな `exp/`**（src-layout にしない）。学習・評価のエントリーポイントは `scripts/` かリポジトリルート。
 - コマンドは **just** に集約: `just setup` / `format` / `lint` / `type` / `test` / `run`。依存追加は `uv add <pkg>`、任意実行は `uv run <cmd>`。
 - 品質ゲートは **ローカルの `just run`**（format → test → type）。**GitHub CI は持たない**（配布物でないため）。lint/format は pre-commit に集約（ruff ほか）。
-- **torch / ML 依存は未確定**。採用が決まるまでランタイム依存は追加しない。開発フローの詳細は `.claude/skills/dev-workflow` を参照。
+- ランタイム依存は **torch / torchvision**（GPU 学習）＋ numpy / attrs。依存追加は `uv add <pkg>`。開発フローの詳細は `.claude/skills/dev-workflow` を参照。
 
 ## 現状
 

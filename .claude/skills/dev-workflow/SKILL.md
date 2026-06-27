@@ -18,7 +18,7 @@ description: saccade-world-model-exp の開発フロー (uv / just / devcontaine
 ## パッケージ管理 (uv)
 
 - 依存導入: `uv sync`（dev グループのみ。ランタイム依存は現状空）。
-- 依存追加: `uv add <pkg>`（**torch は未確定**。採用が決まってから追加する）。
+- 依存追加: `uv add <pkg>`。ランタイム依存は torch / torchvision / numpy / attrs を採用済み。
 - 任意コマンド実行: `uv run <cmd>`（プロジェクトの venv 内で実行）。
 - `uv.lock` はコミットする（再現性）。
 
