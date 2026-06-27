@@ -101,7 +101,7 @@ memory: project
 
 ## エージェントメモリ
 
-実装中に得た知見は `memory/agents/spec-driven-implementer/` のエージェント
+実装中に得た知見は `.claude/agent-memory/spec-driven-implementer/` のエージェント
 メモリに簡潔に記録してください:
 
 - 確立済みの `exp/` モジュール layout / 命名パターン

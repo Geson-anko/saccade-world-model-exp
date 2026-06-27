@@ -4,7 +4,7 @@
 
 各セッション開始時、または規約が関係するタスク着手前にここを確認する。新しい規約・知見が見つかったらファイルを足し、ここから 1 行リンクを張る。コードから読み取れること（構造・規約・git 履歴）は memory に書かない。
 
-エージェント固有メモリは `agents/<agent-name>/` 配下に整理する（spec-planner / spec-driven-implementer / spec-test-author / code-quality-reviewer / docstring-author）。
+エージェント固有メモリは frontmatter `memory: project` により `.claude/agent-memory/<agent-name>/` に自動保存される（spec-planner / spec-driven-implementer / spec-test-author / code-quality-reviewer / docstring-author）。
 
 ## user（ユーザー像）
 

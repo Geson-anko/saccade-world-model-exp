@@ -166,7 +166,7 @@ memory: project
 
 ## エージェントメモリ
 
-リファクタを通じて発見したコードベースの特性は、`memory/agents/code-quality-reviewer/`
+リファクタを通じて発見したコードベースの特性は、`.claude/agent-memory/code-quality-reviewer/`
 のエージェントメモリに簡潔に記録してください。会話を跨いで知見が蓄積され、
 将来の refactor 精度が向上します。記録例:
 

@@ -49,7 +49,7 @@ description: saccade-world-model-exp の開発フロー (uv / just / devcontaine
 ## memory（プロジェクト知識）
 
 - プロジェクト固有の知見は `memory/` に 1 ファイル 1 事項で蓄積し、`memory/MEMORY.md` に 1 行索引を張る。
-- エージェント固有メモリは `memory/agents/<agent-name>/`。
+- エージェント固有メモリは frontmatter `memory: project` により `.claude/agent-memory/<agent-name>/` に自動保存される。
 - コードから読み取れること（構造・規約）は memory に書かない。
 
 ## Claude 設定
