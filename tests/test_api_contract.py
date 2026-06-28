@@ -15,8 +15,15 @@ import exp
 @pytest.mark.api_contract
 def test_exp_exports():
     # Contract pin (not a behaviour test): the public export surface of `exp`
-    # is exactly these three symbols, and each is actually present.
-    expected = {"DeviceLike", "DeviceTransferMixin", "Image"}
+    # is exactly these symbols, and each is actually present.
+    expected = {
+        "ChannelFormat",
+        "DeviceLike",
+        "DeviceTransferMixin",
+        "Image",
+        "Size2d",
+        "size_2d_to_tuple",
+    }
 
     assert set(exp.__all__) == expected
     for name in expected:
