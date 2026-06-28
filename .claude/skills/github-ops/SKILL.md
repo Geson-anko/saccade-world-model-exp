@@ -8,6 +8,8 @@ version: 0.1.0
 
 `saccade-world-model-exp` での GitHub 連携 (PR / issue / push) のための skill。**`gh` CLI と `git` は devcontainer 内で実行する前提**で、Dockerfile に `gh` を同梱済み (`.claude/settings.container.json` で `Bash(git push:*)` / `Bash(gh:*)` を allow 済み)。GitHub CI は持たないので、PR の検証は **ローカルの `just run` 緑** が前提になる。
 
+> **既定の完走点 = PR 作成。** この skill が読み込まれた作業では、**基本的に `gh pr create` で PR を作るところまで完走する** (ブランチ push で止めない)。流れは「作業ブランチ → 実装・コミット → `just run` 緑 → push → `gh pr create`」。PR 作成はマージではないので [安全規約](#6-安全規約) (main へ直接 push しない / `gh pr merge` はユーザー判断) と矛盾しない。明示的に「push まで」「draft で止めて」等の指示がある場合のみ完走しない。
+
 ______________________________________________________________________
 
 ## 1. 認証 (gh auth)
