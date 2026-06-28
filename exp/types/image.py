@@ -193,9 +193,15 @@ class Image(DeviceTransferMixin):
     def save(self, path: Path) -> None:
         """[0, 255] へ正規化し uint8 で画像ファイルに保存する。
 
-        GRAY/RGB/RGBA に対応。拡張子でフォーマット判定 (JPEG は alpha 非対応)。
+        拡張子でフォーマット判定。RGBA は PNG のみ可 (JPEG は alpha 非対応)。
         """
-        # to_pil_image 経由で保存する (torchvision.io.write_png は 1/3ch のみで
-        # RGBA を書けないため)。PIL が拡張子からフォーマットを判定する。
+        # JPEG は alpha を持てない。拡張子に反して暗黙に別フォーマットへ
+        # 切り替えず、不整合は明示的に弾く。
+        if (
+            path.suffix.lower() in (".jpg", ".jpeg")
+            and self.channel_format is ChannelFormat.RGBA
+        ):
+            raise ValueError(f"JPEG は alpha 非対応で RGBA を保存できない: {path.name}")
+        # torchvision.io.write_png は 1/3ch のみで RGBA を書けないため PIL を使う。
         tensor = self.normalize(0, 255).uint8().tensor.cpu()
         F.to_pil_image(tensor).save(path)

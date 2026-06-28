@@ -296,3 +296,8 @@ class TestLoadSave:
 
         assert loaded.channels == 4
         assert torch.equal(loaded.tensor, img.normalize(0, 255).uint8().tensor)
+
+    def test_save_rgba_as_jpeg_raises(self, tmp_path):
+        # JPEG は alpha 非対応。暗黙に PNG へ切り替えず明示的にエラーにする。
+        with pytest.raises(ValueError, match="alpha"):
+            Image(torch.zeros(4, 8, 8, dtype=torch.uint8)).save(tmp_path / "a.jpg")
