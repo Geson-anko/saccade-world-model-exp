@@ -115,21 +115,23 @@ class Image(DeviceTransferMixin):
         if self.channel_format is fmt:
             return self
         rgb = self._as_rgb()
-        if fmt is ChannelFormat.GRAY:
-            out = F.rgb_to_grayscale(rgb, num_output_channels=1)
-        elif fmt is ChannelFormat.RGB:
-            out = rgb
-        else:  # RGBA
-            out = torch.cat([rgb, self._alpha_like(rgb)], dim=0)
+        match fmt:
+            case ChannelFormat.GRAY:
+                out = F.rgb_to_grayscale(rgb, num_output_channels=1)
+            case ChannelFormat.RGB:
+                out = rgb
+            case ChannelFormat.RGBA:
+                out = torch.cat([rgb, self._alpha_like(rgb)], dim=0)
         return type(self)(out)
 
     def _as_rgb(self) -> torch.Tensor:
-        fmt = self.channel_format
-        if fmt is ChannelFormat.GRAY:
-            return self.tensor.repeat(3, 1, 1)
-        if fmt is ChannelFormat.RGBA:
-            return self.tensor[:3]
-        return self.tensor
+        match self.channel_format:
+            case ChannelFormat.GRAY:
+                return self.tensor.repeat(3, 1, 1)
+            case ChannelFormat.RGBA:
+                return self.tensor[:3]
+            case ChannelFormat.RGB:
+                return self.tensor
 
     @staticmethod
     def _alpha_like(rgb: torch.Tensor) -> torch.Tensor:
@@ -196,7 +198,8 @@ class Image(DeviceTransferMixin):
         tensor = self.normalize(0, 255).uint8().tensor.cpu()
         if tensor.shape[0] not in (1, 3):
             raise ValueError(f"save supports 1 or 3 channels, got {tensor.shape[0]}")
-        if path.suffix.lower() in (".jpg", ".jpeg"):
-            write_jpeg(tensor, str(path))
-        else:
-            write_png(tensor, str(path))
+        match path.suffix.lower():
+            case ".jpg" | ".jpeg":
+                write_jpeg(tensor, str(path))
+            case _:
+                write_png(tensor, str(path))
