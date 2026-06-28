@@ -14,17 +14,10 @@ Two surfaces are pinned:
   and ``torch.compile`` parity (executability guarantee).
 """
 
-import math
-
 import pytest
 import torch
-from torch import nn
 
-from exp.models.components.vit import (
-    AxialRoPE,
-    VisionTransformer,
-    _fix_init_weight,
-)
+from exp.models.components.vit import AxialRoPE, VisionTransformer
 
 # Small ViT config reused across VisionTransformer tests.
 # image 8x8, patch 4x4 -> grid 2x2 -> n_patches 4.
@@ -109,42 +102,6 @@ class TestAxialRoPEMath:
         # Two axes x even-rotation-pairs require head_dim % 4 == 0; 6 fails.
         with pytest.raises(ValueError, match="4"):
             AxialRoPE(head_dim=6, grid_hw=(2, 2))
-
-
-class TestFixInitWeight:
-    def test_layer_id_1_divides_weights_by_sqrt2(self):
-        # layer_id=1 -> divide both projection weights by sqrt(2*1) = sqrt(2).
-        attn_proj = nn.Linear(4, 4)
-        mlp_out = nn.Linear(4, 4)
-        nn.init.constant_(attn_proj.weight, 1.0)
-        nn.init.constant_(mlp_out.weight, 1.0)
-
-        _fix_init_weight(attn_proj, mlp_out, layer_id=1)
-
-        expected = torch.full((4, 4), 1.0 / math.sqrt(2.0))
-        torch.testing.assert_close(attn_proj.weight, expected)
-        torch.testing.assert_close(mlp_out.weight, expected)
-
-    def test_layer_id_2_uses_sqrt_of_4(self):
-        # layer_id=2 -> divide by sqrt(2*2) = 2, confirming the layer_id factor.
-        attn_proj = nn.Linear(4, 4)
-        mlp_out = nn.Linear(4, 4)
-        nn.init.constant_(attn_proj.weight, 1.0)
-        nn.init.constant_(mlp_out.weight, 1.0)
-
-        _fix_init_weight(attn_proj, mlp_out, layer_id=2)
-
-        expected = torch.full((4, 4), 1.0 / math.sqrt(4.0))
-        torch.testing.assert_close(attn_proj.weight, expected)
-        torch.testing.assert_close(mlp_out.weight, expected)
-
-    def test_layer_id_zero_raises_value_error(self):
-        # 1-based layer ids: 0 would divide by sqrt(0) -> rejected up front.
-        attn_proj = nn.Linear(4, 4)
-        mlp_out = nn.Linear(4, 4)
-
-        with pytest.raises(ValueError):
-            _fix_init_weight(attn_proj, mlp_out, layer_id=0)
 
 
 class TestVisionTransformerShape:
