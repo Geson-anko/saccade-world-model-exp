@@ -33,6 +33,9 @@ services:
     environment:
       # nvidia-smi (utility) と CUDA (compute) の両方を使えるようにする。
       NVIDIA_DRIVER_CAPABILITIES: all
+      # container 内からデータセットを参照する位置 (下の read-only マウント先)。
+      # host 側の場所は .devcontainer/.env の DATA_DIR で指定する。
+      DATA_DIR: /data
     deploy:
       resources:
         reservations:
@@ -42,6 +45,9 @@ services:
               capabilities: [gpu]
     volumes:
       - ../:/workspace
+      # host のデータセットを read-only でマウント。${DATA_DIR} は .devcontainer/.env
+      # で環境ごとに指定する (未設定なら compose が :? で明示エラーを出す)。
+      - "${DATA_DIR:?DATA_DIR を .devcontainer/.env に設定してください (host のデータセット位置)}:/data:ro"
       # uv / pre-commit の既定キャッシュパスに named volume をマウント (再ビルド跨ぎで永続)。
       - cache-uv:/home/dev/.cache/uv
       - cache-precommit:/home/dev/.cache/pre-commit
