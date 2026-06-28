@@ -4,7 +4,7 @@
 
 各セッション開始時、または規約が関係するタスク着手前にここを確認する。新しい規約・知見が見つかったらファイルを足し、ここから 1 行リンクを張る。コードから読み取れること（構造・規約・git 履歴）は memory に書かない。
 
-エージェント固有メモリは `agents/<agent-name>/` 配下に整理する（spec-planner / spec-driven-implementer / spec-test-author / code-quality-reviewer / docstring-author）。
+エージェント固有メモリは frontmatter `memory: project` により `.claude/agent-memory/<agent-name>/` に自動保存される（spec-planner / spec-driven-implementer / spec-test-author / code-quality-reviewer / docstring-author）。
 
 ## user（ユーザー像）
 
@@ -12,7 +12,8 @@
 
 ## feedback（規約・ガイドライン）
 
-<!-- 確定した進め方・規約をここに 1 行で。 -->
+- [attrs + torch eq](attrs-tensor-eq.md) — Tensor を持つ attrs クラスは eq=False 必須 (自動 __eq__ が壊れる)
+- [docformatter 日本語](docformatter-japanese.md) — 日本語 docstring は日本語始まり・短文で書く (capitalize / 途中改行を回避)
 
 ## project（実装上の固有事情）
 

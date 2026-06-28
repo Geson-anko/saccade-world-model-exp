@@ -174,7 +174,7 @@ Do NOT ask permission for routine decisions — exercise expert judgment.
 
 ## エージェントメモリ
 
-Update your agent memory in `memory/agents/docstring-author/` as you discover documentation patterns, terminology conventions, public API structures, recurring design intents, and codebase-specific docstring styles. This builds institutional knowledge across sessions. Examples of what to record:
+Update your agent memory in `.claude/agent-memory/docstring-author/` as you discover documentation patterns, terminology conventions, public API structures, recurring design intents, and codebase-specific docstring styles. This builds institutional knowledge across sessions. Examples of what to record:
 
 - Established docstring style/format observed in the project (Google, NumPy, plain PEP 257, etc.).
 - Domain terminology and coordinate/symbol conventions (e.g. `p`, `z`, `b_t`) and how they map across the codebase.

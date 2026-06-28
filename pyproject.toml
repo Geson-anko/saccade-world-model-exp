@@ -4,9 +4,12 @@ version = "0.1.0"
 description = "In-context autoregressive latent world model over saccadic image glimpses (experiment)"
 readme = "README.md"
 requires-python = ">=3.13"
-# ランタイム依存はまだ確定していない (torch を採用するかは未決定)。
-# 採用が決まった時点で `uv add <pkg>` で追加する。
-dependencies = []
+dependencies = [
+    "attrs>=26.1.0",
+    "numpy>=2.5.0",
+    "torch>=2.12.1",
+    "torchvision>=0.27.1",
+]
 
 [dependency-groups]
 # 開発ツールのみ。GitHub CI は持たず、ローカルゲート (`just run`) で品質を担保する。
@@ -33,6 +36,9 @@ pythonpath = "."
 filterwarnings = [
   "ignore::DeprecationWarning",
   "ignore::UserWarning",
+]
+markers = [
+  "api_contract: 公開 API 契約ピン (振る舞いテストではない)",
 ]
 
 [tool.pyright]
