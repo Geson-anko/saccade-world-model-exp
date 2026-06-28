@@ -5,7 +5,7 @@ from typing import Self, override
 import attrs
 import torch
 import torchvision.transforms.v2.functional as F
-from torchvision.io import ImageReadMode, read_image, write_jpeg, write_png
+from torchvision.io import ImageReadMode, read_image
 from torchvision.transforms.v2.functional import InterpolationMode
 
 from .mixin import DeviceLike, DeviceTransferMixin
@@ -193,13 +193,9 @@ class Image(DeviceTransferMixin):
     def save(self, path: Path) -> None:
         """[0, 255] へ正規化し uint8 で画像ファイルに保存する。
 
-        拡張子が .jpg/.jpeg なら JPEG、それ以外は PNG。1ch / 3ch のみ対応。
+        GRAY/RGB/RGBA に対応。拡張子でフォーマット判定 (JPEG は alpha 非対応)。
         """
+        # to_pil_image 経由で保存する (torchvision.io.write_png は 1/3ch のみで
+        # RGBA を書けないため)。PIL が拡張子からフォーマットを判定する。
         tensor = self.normalize(0, 255).uint8().tensor.cpu()
-        if tensor.shape[0] not in (1, 3):
-            raise ValueError(f"save supports 1 or 3 channels, got {tensor.shape[0]}")
-        match path.suffix.lower():
-            case ".jpg" | ".jpeg":
-                write_jpeg(tensor, str(path))
-            case _:
-                write_png(tensor, str(path))
+        F.to_pil_image(tensor).save(path)

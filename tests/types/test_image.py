@@ -286,6 +286,13 @@ class TestLoadSave:
 
         assert Image.load(path).channels == 1
 
-    def test_save_rejects_rgba(self, tmp_path):
-        with pytest.raises(ValueError, match="channel"):
-            Image(torch.zeros(4, 4, 4, dtype=torch.uint8)).save(tmp_path / "a.png")
+    def test_save_load_rgba_round_trip(self, tmp_path):
+        # RGBA (4ch) も PNG で保存・読み戻しできる (load の UNCHANGED と対称)。
+        img = Image((torch.rand(4, 8, 8) * 255).to(torch.uint8))
+        path = tmp_path / "a.png"
+
+        img.save(path)
+        loaded = Image.load(path)
+
+        assert loaded.channels == 4
+        assert torch.equal(loaded.tensor, img.normalize(0, 255).uint8().tensor)
