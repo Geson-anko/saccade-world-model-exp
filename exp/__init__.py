@@ -1,3 +1,17 @@
-from .types import DeviceLike, DeviceTransferMixin, Image
+from .types import (
+    ChannelFormat,
+    DeviceLike,
+    DeviceTransferMixin,
+    Image,
+    Size2d,
+    size_2d_to_tuple,
+)
 
-__all__ = ["DeviceLike", "DeviceTransferMixin", "Image"]
+__all__ = [
+    "ChannelFormat",
+    "DeviceLike",
+    "DeviceTransferMixin",
+    "Image",
+    "Size2d",
+    "size_2d_to_tuple",
+]
