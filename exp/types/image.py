@@ -231,7 +231,7 @@ class ImageSequence(DeviceTransferMixin):
     def __getitem__(self, index: int) -> Image: ...
     @overload
     def __getitem__(self, index: slice) -> Self: ...
-    def __getitem__(self, index: int | slice) -> "Image | Self":
+    def __getitem__(self, index: int | slice) -> Image | Self:
         if isinstance(index, slice):
             return type(self)(self.tensor[index])
         return Image(self.tensor[index])
@@ -273,7 +273,7 @@ class BatchedImageSequence(DeviceTransferMixin):
     def __getitem__(self, index: int) -> ImageSequence: ...
     @overload
     def __getitem__(self, index: slice) -> Self: ...
-    def __getitem__(self, index: int | slice) -> "ImageSequence | Self":
+    def __getitem__(self, index: int | slice) -> ImageSequence | Self:
         if isinstance(index, slice):
             return type(self)(self.tensor[index])
         return ImageSequence(self.tensor[index])
