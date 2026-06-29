@@ -22,6 +22,7 @@ def test_exp_exports():
         "DeviceTransferMixin",
         "Image",
         "Size2d",
+        "SupportsDeviceTransfer",
         "size_2d_to_tuple",
     }
 

@@ -4,6 +4,7 @@ from .types import (
     DeviceTransferMixin,
     Image,
     Size2d,
+    SupportsDeviceTransfer,
     size_2d_to_tuple,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "DeviceTransferMixin",
     "Image",
     "Size2d",
+    "SupportsDeviceTransfer",
     "size_2d_to_tuple",
 ]
