@@ -191,42 +191,6 @@ class TestSquarePad:
         assert img.square_pad() is img
 
 
-class TestFocus:
-    def test_full_view_returns_whole_image(self):
-        # zoom=1, point=center on a square image returns the image unchanged.
-        img = Image(torch.arange(16, dtype=torch.float32).reshape(1, 4, 4))
-
-        out = img.focus((0.0, 0.0), 1.0)
-
-        assert torch.equal(out.tensor, img.tensor)
-
-    def test_output_side_is_round_zoom_times_side(self):
-        out = Image(torch.zeros(3, 8, 8)).focus((0.0, 0.0), 0.5)
-
-        assert out.is_squared
-        assert out.size == (4, 4)
-
-    def test_squares_non_square_input_first(self):
-        # (4, 8) squares to side 8, so a full-zoom focus yields 8x8.
-        out = Image(torch.zeros(3, 4, 8)).focus((0.0, 0.0), 1.0)
-        assert out.size == (8, 8)
-
-    def test_corner_pads_out_of_bounds(self):
-        # Bottom-right gaze with partial zoom spills past the edge -> zero pad.
-        out = Image(torch.ones(1, 4, 4)).focus((1.0, 1.0), 0.5)
-
-        assert out.size == (2, 2)
-        assert (out.tensor == 0).any()
-
-    def test_rejects_out_of_range_point(self):
-        with pytest.raises(ValueError, match=r"\[-1, 1\]"):
-            Image(torch.zeros(3, 4, 4)).focus((1.5, 0.0), 1.0)
-
-    def test_rejects_out_of_range_zoom(self):
-        with pytest.raises(ValueError, match=r"\(0, 1\]"):
-            Image(torch.zeros(3, 4, 4)).focus((0.0, 0.0), 0.0)
-
-
 class TestResize:
     def test_int_to_square(self):
         assert Image(torch.zeros(3, 4, 8)).resize(16).size == (16, 16)

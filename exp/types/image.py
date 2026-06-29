@@ -155,25 +155,6 @@ class Image(DeviceTransferMixin):
             padding = [0, before, 0, after]
         return type(self)(F.pad(self.tensor, padding, fill=fill_value))
 
-    def focus(self, point: tuple[_float, _float], zoom: _float) -> Self:
-        """注視点 point・拡大率 zoom で正方領域を切り取った新しい Image を返す。
-
-        point は [-1, 1] (中心 0, y=+1 が下)、zoom は (0, 1]。はみ出しは 0 埋め。
-        """
-        x, y = point
-        if not (-1.0 <= x <= 1.0 and -1.0 <= y <= 1.0):
-            raise ValueError(f"focus point must be within [-1, 1], got {point}")
-        if not (0.0 < zoom <= 1.0):
-            raise ValueError(f"focus zoom must be within (0, 1], got {zoom}")
-        squared = self.square_pad()  # 既に正方なら square_pad が自身を返す
-        s = squared.height
-        cx = (s / 2) * (1 + x)
-        cy = (s / 2) * (1 + y)
-        crop = max(1, int(round(zoom * s)))
-        left = int(round(cx - crop / 2))
-        top = int(round(cy - crop / 2))
-        return type(self)(F.crop(squared.tensor, top, left, crop, crop))
-
     def resize(self, size: Size2d) -> Self:
         """指定サイズへリサイズした新しい Image を返す (int は正方、dtype 保存)。"""
         h, w = size_2d_to_tuple(size)
