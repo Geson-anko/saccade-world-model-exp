@@ -1,10 +1,12 @@
 from .device import DeviceLike, DeviceTransferMixin, SupportsDeviceTransfer
 from .focus import Focus
 from .image import BatchedImageSequence, ChannelFormat, Image, ImageSequence
+from .latent import BatchedLatentSequence
 from .size import Size2d, size_2d_to_tuple
 
 __all__ = [
     "BatchedImageSequence",
+    "BatchedLatentSequence",
     "ChannelFormat",
     "DeviceLike",
     "DeviceTransferMixin",
