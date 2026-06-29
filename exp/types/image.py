@@ -1,6 +1,7 @@
 import enum
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Self, override
+from typing import Self, overload, override
 
 import attrs
 import torch
@@ -14,7 +15,7 @@ from .size import Size2d, size_2d_to_tuple
 # float メソッドが組み込み float をシャドウするため、型注釈用に別名を保持する。
 _float = float
 
-__all__ = ["ChannelFormat", "Image"]
+__all__ = ["BatchedImageSequence", "ChannelFormat", "Image", "ImageSequence"]
 
 
 class ChannelFormat(enum.IntEnum):
@@ -205,3 +206,86 @@ class Image(DeviceTransferMixin):
         # torchvision.io.write_png は 1/3ch のみで RGBA を書けないため PIL を使う。
         tensor = self.normalize(0, 255).uint8().tensor.cpu()
         F.to_pil_image(tensor).save(path)
+
+
+@attrs.define(slots=True, frozen=True, eq=False)
+class ImageSequence(DeviceTransferMixin):
+    """(len, C, H, W) の画像系列を内包する不変な値オブジェクト。
+
+    観測列をまとめて運ぶための内部表現。indexing で個々の Image を取り出す。 要素 0（空系列）も許容する。
+    """
+
+    tensor: torch.Tensor  # (len, C, H, W)
+
+    def __attrs_post_init__(self) -> None:
+        if self.tensor.ndim != 4:
+            raise ValueError(
+                f"ImageSequence expects a (len, C, H, W) tensor, got "
+                f"ndim={self.tensor.ndim} shape={tuple(self.tensor.shape)}"
+            )
+
+    def __len__(self) -> int:
+        return self.tensor.shape[0]
+
+    @overload
+    def __getitem__(self, index: int) -> Image: ...
+    @overload
+    def __getitem__(self, index: slice) -> Self: ...
+    def __getitem__(self, index: int | slice) -> "Image | Self":
+        if isinstance(index, slice):
+            return type(self)(self.tensor[index])
+        return Image(self.tensor[index])
+
+    def __iter__(self) -> Iterator[Image]:
+        return (Image(frame) for frame in self.tensor)
+
+    @property
+    @override
+    def device(self) -> torch.device:
+        return self.tensor.device
+
+    @override
+    def to(self, device: DeviceLike) -> Self:
+        return type(self)(self.tensor.to(device))
+
+
+@attrs.define(slots=True, frozen=True, eq=False)
+class BatchedImageSequence(DeviceTransferMixin):
+    """(batch, len, C, H, W) の画像系列バッチを内包する不変な値オブジェクト。
+
+    観測列のバッチをまとめて運ぶための内部表現。indexing で個々の ImageSequence を取り出す。要素
+    0（空バッチ）も許容する。
+    """
+
+    tensor: torch.Tensor  # (batch, len, C, H, W)
+
+    def __attrs_post_init__(self) -> None:
+        if self.tensor.ndim != 5:
+            raise ValueError(
+                f"BatchedImageSequence expects a (batch, len, C, H, W) tensor, got "
+                f"ndim={self.tensor.ndim} shape={tuple(self.tensor.shape)}"
+            )
+
+    def __len__(self) -> int:
+        return self.tensor.shape[0]
+
+    @overload
+    def __getitem__(self, index: int) -> ImageSequence: ...
+    @overload
+    def __getitem__(self, index: slice) -> Self: ...
+    def __getitem__(self, index: int | slice) -> "ImageSequence | Self":
+        if isinstance(index, slice):
+            return type(self)(self.tensor[index])
+        return ImageSequence(self.tensor[index])
+
+    def __iter__(self) -> Iterator[ImageSequence]:
+        return (ImageSequence(seq) for seq in self.tensor)
+
+    @property
+    @override
+    def device(self) -> torch.device:
+        return self.tensor.device
+
+    @override
+    def to(self, device: DeviceLike) -> Self:
+        return type(self)(self.tensor.to(device))

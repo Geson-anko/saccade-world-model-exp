@@ -31,3 +31,20 @@ metadata:
   `issubclass(exp.Image, exp.DeviceTransferMixin)` is allowed ONLY here as a
   base-class contract pin. See [[testing-conventions]].
 - `tests/types/` has NO `__init__.py` (test filenames are unique).
+- `ImageSequence` (len,C,H,W) and `BatchedImageSequence` (batch,len,C,H,W) are
+  added to `exp/types/image.py` symmetric to `Image`: same `DeviceTransferMixin`
+  base, ndim-only validation, identity-style value object. They do NOT subclass
+  `collections.abc.Sequence` (so `count`/`index`/`in` are intentionally absent —
+  do NOT pin their absence or test them). Tested by appending classes to the
+  same `tests/types/test_image.py` (one file per source module).
+- Sequence test conventions: empty `(0,...)` tensors are VALID (pin via
+  `len == 0` + `list(...) == []`); `__getitem__[int]` returns the element type,
+  `[slice]` returns the same container type — assert with `type(x) is Cls`, not
+  `isinstance` (slice must not collapse to the element type); index/iter values
+  checked with `torch.equal` against `.tensor[i]`; out-of-range int → `IndexError`
+  (torch indexing). Error message substring is `"len, C, H, W"` /
+  `"batch, len, C, H, W"` plus actual ndim+shape.
+- New api_contract pins added to the SAME `tests/test_api_contract.py`: the two
+  names go into the `test_exp_exports` `expected` set, and one combined
+  `issubclass(..., DeviceTransferMixin)` pin covers both. These are red until the
+  parallel impl agent adds the symbols to `exp.__all__` / `exp/__init__.py`.
