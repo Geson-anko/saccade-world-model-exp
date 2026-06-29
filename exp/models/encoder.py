@@ -19,12 +19,6 @@ from .weight import init_weights
 
 __all__ = ["ImageEncoder"]
 
-_EMBED_DIM = 192
-_DEPTH = 12
-_NUM_HEADS = 3  # head_dim = 192 / 3 = 64 (AxialRoPE の 4 の倍数制約を満たす)
-_PATCH_SIZE = 16
-_MLP_RATIO = 4.0
-
 
 class ImageEncoder(nn.Module):
     """観測画像列を潜在系列へ符号化する Encoder。
@@ -39,7 +33,7 @@ class ImageEncoder(nn.Module):
     時はバッチ内グリンプスに依存し、eval 時は running stats で決定的になる (LeWorldModel
     と同じ意図的挙動)。
 
-    前提条件:     ``image_size`` は内部 ViT の patch size (16)
+    前提条件:     ``image_size`` は内部 ViT の ``patch_size`` (既定 16)
     で割り切れること。割り切れない場合は ViT     構築時に ValueError が送出される。学習は実質 ``batch *
     seq >> 1`` を想定する (train 時     BatchNorm の分散が定義されるため)。
     """
@@ -54,18 +48,26 @@ class ImageEncoder(nn.Module):
         in_channels: int,
         latent_dim: int,
         *,
+        patch_size: Size2d = 16,
+        embed_dim: int = 192,
+        depth: int = 12,
+        num_heads: int = 3,
+        mlp_ratio: float = 4.0,
         init_std: float = 0.02,
     ) -> None:
         super().__init__()
         self.latent_dim: int = latent_dim  # 公開属性 (下流が入力次元を知る)
+        # ViT のアーキは LeWorldModel 準拠の既定値 (上書き可)。num_heads は
+        # head_dim (= embed_dim / num_heads) が 4 の倍数になるよう選ぶこと
+        # (例 192/3=64。AxialRoPE 制約)。崩せば VisionTransformer 構築時に ValueError。
         self.vit = VisionTransformer(
             image_size,
-            _PATCH_SIZE,
+            patch_size,
             in_channels,
-            _EMBED_DIM,
-            _DEPTH,
-            _NUM_HEADS,
-            mlp_ratio=_MLP_RATIO,
+            embed_dim,
+            depth,
+            num_heads,
+            mlp_ratio=mlp_ratio,
             init_std=init_std,
         )  # 構築時に自己初期化 (_fix_init_weight 含む)
         self.proj = nn.Linear(self.vit.embed_dim, latent_dim)
