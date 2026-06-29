@@ -501,3 +501,110 @@ class TestBatchedImageSequenceDeviceTransfer:
 
         assert type(result) is BatchedImageSequence
         assert torch.equal(result.tensor, batch.tensor)
+
+
+def _distinct_image(index: int) -> Image:
+    # Build an Image whose pixels are unique to `index` so order-preservation
+    # is observable: each (3, 8, 16) tensor is a contiguous arange offset by a
+    # per-index stride, leaving no two frames equal.
+    stride = 3 * 8 * 16
+    return Image(torch.arange(index * stride, (index + 1) * stride).reshape(3, 8, 16))
+
+
+def _distinct_sequence(index: int) -> ImageSequence:
+    # Same idea at the sequence level: a unique (5, 3, 8, 16) block per index.
+    stride = 5 * 3 * 8 * 16
+    return ImageSequence(
+        torch.arange(index * stride, (index + 1) * stride).reshape(5, 3, 8, 16)
+    )
+
+
+class TestImageSequenceFromImages:
+    def test_stacks_multiple_images(self):
+        # Three value-distinct Images stack into a (len, C, H, W) sequence; the
+        # per-frame torch.equal checks pin both element identity and order.
+        images = [_distinct_image(0), _distinct_image(1), _distinct_image(2)]
+
+        result = ImageSequence.from_images(images)
+
+        assert type(result) is ImageSequence
+        assert len(result) == 3
+        assert result.tensor.shape == (3, 3, 8, 16)
+        assert torch.equal(result.tensor[0], images[0].tensor)
+        assert torch.equal(result.tensor[1], images[1].tensor)
+        assert torch.equal(result.tensor[2], images[2].tensor)
+
+    def test_single_image(self):
+        # The minimum non-empty input is one Image, yielding leading axis 1.
+        image = _distinct_image(7)
+
+        result = ImageSequence.from_images([image])
+
+        assert type(result) is ImageSequence
+        assert len(result) == 1
+        assert result.tensor.shape == (1, 3, 8, 16)
+        assert torch.equal(result.tensor[0], image.tensor)
+
+    def test_empty_raises_value_error(self):
+        # Empty input violates the "at least one" contract (substring match only).
+        with pytest.raises(ValueError, match="at least one"):
+            ImageSequence.from_images([])
+
+    def test_accepts_generator(self):
+        # A one-shot generator (N>=1) must work: the empty check and the stack
+        # both succeed, proving the input is materialized before being scanned.
+        result = ImageSequence.from_images(_distinct_image(i) for i in range(2))
+
+        assert type(result) is ImageSequence
+        assert len(result) == 2
+        assert result.tensor.shape == (2, 3, 8, 16)
+
+    def test_preserves_dtype(self):
+        # torch.stack carries the element dtype through; uint8 must survive.
+        images = [Image(torch.zeros(3, 8, 16, dtype=torch.uint8)) for _ in range(2)]
+
+        result = ImageSequence.from_images(images)
+
+        assert result.tensor.dtype == torch.uint8
+
+
+class TestBatchedImageSequenceFromSequences:
+    def test_stacks_multiple_sequences(self):
+        # Two value-distinct sequences stack into (batch, len, C, H, W); the
+        # per-entry torch.equal checks pin both element identity and order.
+        sequences = [_distinct_sequence(0), _distinct_sequence(1)]
+
+        result = BatchedImageSequence.from_sequences(sequences)
+
+        assert type(result) is BatchedImageSequence
+        assert len(result) == 2
+        assert result.tensor.shape == (2, 5, 3, 8, 16)
+        assert torch.equal(result.tensor[0], sequences[0].tensor)
+        assert torch.equal(result.tensor[1], sequences[1].tensor)
+
+    def test_single_sequence(self):
+        # The minimum non-empty input is one ImageSequence, yielding batch 1.
+        sequence = _distinct_sequence(3)
+
+        result = BatchedImageSequence.from_sequences([sequence])
+
+        assert type(result) is BatchedImageSequence
+        assert len(result) == 1
+        assert result.tensor.shape == (1, 5, 3, 8, 16)
+        assert torch.equal(result.tensor[0], sequence.tensor)
+
+    def test_empty_raises_value_error(self):
+        # Empty input violates the "at least one" contract (substring match only).
+        with pytest.raises(ValueError, match="at least one"):
+            BatchedImageSequence.from_sequences([])
+
+    def test_accepts_generator(self):
+        # A one-shot generator (N>=1) must work: materialization lets the empty
+        # check and the stack both scan the same elements.
+        result = BatchedImageSequence.from_sequences(
+            _distinct_sequence(i) for i in range(2)
+        )
+
+        assert type(result) is BatchedImageSequence
+        assert len(result) == 2
+        assert result.tensor.shape == (2, 5, 3, 8, 16)

@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import enum
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Self, overload, override
+from typing import final, overload, override
 
 import attrs
 import torch
@@ -26,6 +28,7 @@ class ChannelFormat(enum.IntEnum):
     RGBA = 4
 
 
+@final
 @attrs.define(slots=True, frozen=True, eq=False)
 class Image(DeviceTransferMixin):
     """(C, H, W) の単一画像を内包する不変な値オブジェクト。
@@ -72,19 +75,19 @@ class Image(DeviceTransferMixin):
         return self.tensor.device
 
     @override
-    def to(self, device: DeviceLike) -> Self:
+    def to(self, device: DeviceLike) -> Image:
         """指定 device に転送した新しい Image を返す (in-place ではない)。"""
-        return type(self)(self.tensor.to(device))
+        return Image(self.tensor.to(device))
 
-    def float(self) -> Self:
+    def float(self) -> Image:
         """浮動小数点 (float32) へキャストした新しい Image を返す。"""
-        return type(self)(self.tensor.float())
+        return Image(self.tensor.float())
 
-    def uint8(self) -> Self:
+    def uint8(self) -> Image:
         """符号なし 8bit 整数 (uint8) へキャストした新しい Image を返す。"""
-        return type(self)(self.tensor.to(torch.uint8))
+        return Image(self.tensor.to(torch.uint8))
 
-    def standardize(self, mean: _float = 0.0, std: _float = 1.0) -> Self:
+    def standardize(self, mean: _float = 0.0, std: _float = 1.0) -> Image:
         """画素統計を平均 mean・標準偏差 std に揃えた新しい Image を返す。
 
         画像全体で統計をとり、定数画像では全画素を mean にする (0 除算回避)。
@@ -93,10 +96,10 @@ class Image(DeviceTransferMixin):
         centered = t - t.mean()
         spread = t.std()
         if float(spread) == 0.0:
-            return type(self)(centered + mean)
-        return type(self)(centered / spread * std + mean)
+            return Image(centered + mean)
+        return Image(centered / spread * std + mean)
 
-    def normalize(self, min: _float = 0.0, max: _float = 1.0) -> Self:
+    def normalize(self, min: _float = 0.0, max: _float = 1.0) -> Image:
         """画素の min/max を [min, max] へ線形伸張した新しい Image を返す。
 
         画像全体で min/max をとり、レンジゼロでは全画素を min にする。
@@ -105,10 +108,10 @@ class Image(DeviceTransferMixin):
         lo = t.min()
         hi = t.max()
         if float(hi) == float(lo):
-            return type(self)(torch.full_like(t, min))
-        return type(self)((t - lo) / (hi - lo) * (max - min) + min)
+            return Image(torch.full_like(t, min))
+        return Image((t - lo) / (hi - lo) * (max - min) + min)
 
-    def as_channel_format(self, fmt: ChannelFormat) -> Self:
+    def as_channel_format(self, fmt: ChannelFormat) -> Image:
         """指定のチャンネル形式へ変換した新しい Image を返す。
 
         いったん RGB を経由して目標形式へ移す。同一形式なら自身を返す。
@@ -123,7 +126,7 @@ class Image(DeviceTransferMixin):
                 out = rgb
             case ChannelFormat.RGBA:
                 out = torch.cat([rgb, self._alpha_like(rgb)], dim=0)
-        return type(self)(out)
+        return Image(out)
 
     def _as_rgb(self) -> torch.Tensor:
         match self.channel_format:
@@ -139,7 +142,7 @@ class Image(DeviceTransferMixin):
         fill = 1.0 if rgb.is_floating_point() else 255
         return torch.full((1, *rgb.shape[1:]), fill, dtype=rgb.dtype, device=rgb.device)
 
-    def square_pad(self, fill_value: _float = 0) -> Self:
+    def square_pad(self, fill_value: _float = 0) -> Image:
         """短辺を長辺に合わせて対称パディングし正方化した新しい Image を返す。
 
         差が奇数なら前側を 1px 小さくする。既に正方なら自身を返す。
@@ -153,9 +156,9 @@ class Image(DeviceTransferMixin):
             padding = [before, 0, after, 0]
         else:
             padding = [0, before, 0, after]
-        return type(self)(F.pad(self.tensor, padding, fill=fill_value))
+        return Image(F.pad(self.tensor, padding, fill=fill_value))
 
-    def resize(self, size: Size2d) -> Self:
+    def resize(self, size: Size2d) -> Image:
         """指定サイズへリサイズした新しい Image を返す (int は正方、dtype 保存)。"""
         h, w = size_2d_to_tuple(size)
         out = F.resize(
@@ -164,10 +167,10 @@ class Image(DeviceTransferMixin):
             interpolation=InterpolationMode.BILINEAR,
             antialias=True,
         )
-        return type(self)(out)
+        return Image(out)
 
     @classmethod
-    def load(cls, path: Path) -> Self:
+    def load(cls, path: Path) -> Image:
         """画像ファイルを読み込み Image を返す (uint8・元チャンネルのまま)。"""
         tensor = read_image(str(path), mode=ImageReadMode.UNCHANGED)
         return cls(tensor)
@@ -189,6 +192,7 @@ class Image(DeviceTransferMixin):
         F.to_pil_image(tensor).save(path)
 
 
+@final
 @attrs.define(slots=True, frozen=True, eq=False)
 class ImageSequence(DeviceTransferMixin):
     """(len, C, H, W) の画像系列を内包する不変な値オブジェクト。
@@ -211,10 +215,10 @@ class ImageSequence(DeviceTransferMixin):
     @overload
     def __getitem__(self, index: int) -> Image: ...
     @overload
-    def __getitem__(self, index: slice) -> Self: ...
-    def __getitem__(self, index: int | slice) -> Image | Self:
+    def __getitem__(self, index: slice) -> ImageSequence: ...
+    def __getitem__(self, index: int | slice) -> Image | ImageSequence:
         if isinstance(index, slice):
-            return type(self)(self.tensor[index])
+            return ImageSequence(self.tensor[index])
         return Image(self.tensor[index])
 
     def __iter__(self) -> Iterator[Image]:
@@ -226,10 +230,24 @@ class ImageSequence(DeviceTransferMixin):
         return self.tensor.device
 
     @override
-    def to(self, device: DeviceLike) -> Self:
-        return type(self)(self.tensor.to(device))
+    def to(self, device: DeviceLike) -> ImageSequence:
+        return ImageSequence(self.tensor.to(device))
+
+    @classmethod
+    def from_images(cls, images: Iterable[Image]) -> ImageSequence:
+        """複数の Image を先頭次元に積んだ ImageSequence を構築する。
+
+        各 Image の (C, H, W) が一致している必要がある (呼び出し側責務)。 空入力は
+        ValueError。shape 不一致は torch.stack の例外を伝播する。
+        """
+        materialized = list(images)
+        if not materialized:
+            raise ValueError("from_images requires at least one Image")
+        stacked = torch.stack([image.tensor for image in materialized], dim=0)
+        return cls(stacked)
 
 
+@final
 @attrs.define(slots=True, frozen=True, eq=False)
 class BatchedImageSequence(DeviceTransferMixin):
     """(batch, len, C, H, W) の画像系列バッチを内包する不変な値オブジェクト。
@@ -253,10 +271,10 @@ class BatchedImageSequence(DeviceTransferMixin):
     @overload
     def __getitem__(self, index: int) -> ImageSequence: ...
     @overload
-    def __getitem__(self, index: slice) -> Self: ...
-    def __getitem__(self, index: int | slice) -> ImageSequence | Self:
+    def __getitem__(self, index: slice) -> BatchedImageSequence: ...
+    def __getitem__(self, index: int | slice) -> ImageSequence | BatchedImageSequence:
         if isinstance(index, slice):
-            return type(self)(self.tensor[index])
+            return BatchedImageSequence(self.tensor[index])
         return ImageSequence(self.tensor[index])
 
     def __iter__(self) -> Iterator[ImageSequence]:
@@ -268,5 +286,18 @@ class BatchedImageSequence(DeviceTransferMixin):
         return self.tensor.device
 
     @override
-    def to(self, device: DeviceLike) -> Self:
-        return type(self)(self.tensor.to(device))
+    def to(self, device: DeviceLike) -> BatchedImageSequence:
+        return BatchedImageSequence(self.tensor.to(device))
+
+    @classmethod
+    def from_sequences(cls, sequences: Iterable[ImageSequence]) -> BatchedImageSequence:
+        """複数の ImageSequence を先頭次元に積んだ BatchedImageSequence を構築する。
+
+        各 ImageSequence の (len, C, H, W) が一致している必要がある (呼び出し側責務)。 空入力は
+        ValueError。shape 不一致は torch.stack の例外を伝播する。
+        """
+        materialized = list(sequences)
+        if not materialized:
+            raise ValueError("from_sequences requires at least one ImageSequence")
+        stacked = torch.stack([sequence.tensor for sequence in materialized], dim=0)
+        return cls(stacked)
