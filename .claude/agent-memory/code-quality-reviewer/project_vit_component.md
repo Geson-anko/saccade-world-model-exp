@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-`exp/models/components/vit.py` = 画像エンコーダ VisionTransformer と内部 building block。
+`exp/models/vit.py` = 画像エンコーダ VisionTransformer と内部 building block (`components/` は flatten 済みで存在しない)。`Mlp` は `exp/models/mlp.py` へ移設され、`vit.py` は `from .mlp import Mlp` で import して `__all__` に再 export 維持。
 
 public 面 (変更不可):
 - `__all__`: AxialRoPE, Attention, Block, Mlp, PatchEmbed, VisionTransformer

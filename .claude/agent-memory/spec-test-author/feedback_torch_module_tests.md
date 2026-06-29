@@ -36,3 +36,16 @@ real tensors catch upstream/behaviour drift that fakes hide.
   Avoids needing a new strict-marker; keeps the test self-contained.
 - Don't register a `gpu`/compile marker unless GPU is actually required — the
   try/skip pattern is preferred for optional-backend tests.
+- Parallel-scan recurrences (minGRU log-space scan): pin the vectorised
+  `forward` against an INDEPENDENT code path — loop the public `step` (plain
+  recurrence) over the seq axis and `torch.stack`. Two different
+  implementations agreeing avoids the tautology of comparing a scan to itself.
+  Use `.double()` model + `.double()` input; float32 log-space scans drift past
+  `assert_close` defaults. Test from zeros AND a random initial hidden (h_0
+  side-term branch). Force saturated gates via public param rewrite under
+  `no_grad` (zero `fc_z.weight`, large +/- `fc_z.bias` => z->1 / z->0) to pin
+  the z=1 (output==candidate, hidden-independent) and z=0 (holds initial
+  hidden) limits without touching internals. NaN-clamp branches (relu before
+  log): drive the offending pre-activation hard negative (large negative
+  `fc_h.bias`), `out.sum().backward()`, assert every param/input grad is
+  `torch.isfinite`.

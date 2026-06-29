@@ -1,0 +1,2 @@
+- [Docstring style of this repo](docstring-style.md) — 日本語ベース・reST クロスリファレンス・記号原形・shape 契約を明示する様式
+- [models package public surface](models-public-surface.md) — exp/models の公開 API と記号規約 (p/z/a/o/e/b_t, SequenceModel 契約)
