@@ -12,7 +12,7 @@ of torch) per the project testing strategy.
 import pytest
 import torch
 
-from exp.types.image import ChannelFormat, Image
+from exp.types.image import BatchedImageSequence, ChannelFormat, Image, ImageSequence
 
 
 class TestConstruction:
@@ -301,3 +301,239 @@ class TestLoadSave:
         # JPEG は alpha 非対応。暗黙に PNG へ切り替えず明示的にエラーにする。
         with pytest.raises(ValueError, match="alpha"):
             Image(torch.zeros(4, 8, 8, dtype=torch.uint8)).save(tmp_path / "a.jpg")
+
+
+class TestImageSequenceConstruction:
+    def test_rejects_3d_tensor(self):
+        # A 3D tensor lacks the leading length axis required by (len, C, H, W).
+        with pytest.raises(ValueError, match=r"len, C, H, W"):
+            ImageSequence(torch.zeros(3, 8, 16))
+
+    def test_rejects_5d_tensor(self):
+        # A 5D tensor carries an extra batch axis the sequence forbids.
+        with pytest.raises(ValueError, match=r"len, C, H, W"):
+            ImageSequence(torch.zeros(2, 5, 3, 8, 16))
+
+    def test_error_reports_actual_ndim_and_shape(self):
+        # The message must surface the offending ndim and shape (substring only).
+        with pytest.raises(ValueError) as exc:
+            ImageSequence(torch.zeros(3, 8, 16))
+
+        assert "len, C, H, W" in str(exc.value)
+        assert "3" in str(exc.value)  # ndim
+        assert "8" in str(exc.value) and "16" in str(exc.value)  # shape
+
+    def test_accepts_4d_tensor(self):
+        seq = ImageSequence(torch.zeros(5, 3, 8, 16))
+        assert len(seq) == 5
+
+    def test_accepts_empty_sequence(self):
+        # An empty (0, C, H, W) sequence is a valid value, not an error.
+        seq = ImageSequence(torch.zeros(0, 3, 8, 16))
+        assert len(seq) == 0
+
+
+class TestImageSequenceIndexing:
+    def test_int_index_returns_image(self):
+        seq = ImageSequence(torch.arange(5 * 3 * 8 * 16).reshape(5, 3, 8, 16))
+
+        frame = seq[2]
+
+        assert type(frame) is Image
+        assert torch.equal(frame.tensor, seq.tensor[2])
+
+    def test_negative_index_returns_last_image(self):
+        seq = ImageSequence(torch.arange(5 * 3 * 8 * 16).reshape(5, 3, 8, 16))
+
+        frame = seq[-1]
+
+        assert type(frame) is Image
+        assert torch.equal(frame.tensor, seq.tensor[4])
+
+    def test_slice_returns_image_sequence(self):
+        seq = ImageSequence(torch.arange(5 * 3 * 8 * 16).reshape(5, 3, 8, 16))
+
+        sub = seq[1:3]
+
+        assert type(sub) is ImageSequence
+        assert len(sub) == 2
+        assert torch.equal(sub.tensor[0], seq.tensor[1])
+        assert torch.equal(sub.tensor[1], seq.tensor[2])
+
+    def test_out_of_range_int_raises_index_error(self):
+        seq = ImageSequence(torch.zeros(5, 3, 8, 16))
+        with pytest.raises(IndexError):
+            _ = seq[5]
+
+
+class TestImageSequenceLen:
+    def test_len_is_leading_axis(self):
+        assert len(ImageSequence(torch.zeros(5, 3, 8, 16))) == 5
+
+    def test_len_of_empty_is_zero(self):
+        assert len(ImageSequence(torch.zeros(0, 3, 8, 16))) == 0
+
+
+class TestImageSequenceIter:
+    def test_iterates_frames_as_images(self):
+        seq = ImageSequence(torch.arange(5 * 3 * 8 * 16).reshape(5, 3, 8, 16))
+
+        frames = list(seq)
+
+        assert len(frames) == 5
+        assert all(type(f) is Image for f in frames)
+        for i, frame in enumerate(frames):
+            assert torch.equal(frame.tensor, seq.tensor[i])
+
+    def test_iterates_empty_as_no_frames(self):
+        assert list(ImageSequence(torch.zeros(0, 3, 8, 16))) == []
+
+
+class TestImageSequenceDeviceTransfer:
+    def test_device_reflects_tensor(self):
+        assert ImageSequence(torch.zeros(5, 3, 8, 16)).device == torch.device("cpu")
+
+    def test_device_available_for_empty_sequence(self):
+        assert ImageSequence(torch.zeros(0, 3, 8, 16)).device == torch.device("cpu")
+
+    def test_to_returns_new_sequence(self):
+        # `to` is not in-place: it returns a fresh ImageSequence with equal values.
+        seq = ImageSequence(torch.zeros(5, 3, 8, 16))
+
+        result = seq.to("cpu")
+
+        assert type(result) is ImageSequence
+        assert result is not seq
+        assert torch.equal(result.tensor, seq.tensor)
+
+    def test_to_accepts_torch_device(self):
+        seq = ImageSequence(torch.zeros(5, 3, 8, 16))
+
+        result = seq.to(torch.device("cpu"))
+
+        assert type(result) is ImageSequence
+        assert torch.equal(result.tensor, seq.tensor)
+
+
+class TestBatchedImageSequenceConstruction:
+    def test_rejects_4d_tensor(self):
+        # A 4D tensor lacks the leading batch axis required by (batch, len, C, H, W).
+        with pytest.raises(ValueError, match=r"batch, len, C, H, W"):
+            BatchedImageSequence(torch.zeros(5, 3, 8, 16))
+
+    def test_rejects_6d_tensor(self):
+        # A 6D tensor carries an extra axis the batched sequence forbids.
+        with pytest.raises(ValueError, match=r"batch, len, C, H, W"):
+            BatchedImageSequence(torch.zeros(2, 2, 5, 3, 8, 16))
+
+    def test_error_reports_actual_ndim_and_shape(self):
+        # The message must surface the offending ndim and shape (substring only).
+        with pytest.raises(ValueError) as exc:
+            BatchedImageSequence(torch.zeros(5, 3, 8, 16))
+
+        assert "batch, len, C, H, W" in str(exc.value)
+        assert "4" in str(exc.value)  # ndim
+        assert "8" in str(exc.value) and "16" in str(exc.value)  # shape
+
+    def test_accepts_5d_tensor(self):
+        batch = BatchedImageSequence(torch.zeros(2, 5, 3, 8, 16))
+        assert len(batch) == 2
+
+    def test_accepts_empty_batch(self):
+        # An empty (0, len, C, H, W) batch is a valid value, not an error.
+        batch = BatchedImageSequence(torch.zeros(0, 5, 3, 8, 16))
+        assert len(batch) == 0
+
+
+class TestBatchedImageSequenceIndexing:
+    def test_int_index_returns_image_sequence(self):
+        batch = BatchedImageSequence(
+            torch.arange(2 * 5 * 3 * 8 * 16).reshape(2, 5, 3, 8, 16)
+        )
+
+        seq = batch[1]
+
+        assert type(seq) is ImageSequence
+        assert torch.equal(seq.tensor, batch.tensor[1])
+
+    def test_negative_index_returns_last_sequence(self):
+        batch = BatchedImageSequence(
+            torch.arange(2 * 5 * 3 * 8 * 16).reshape(2, 5, 3, 8, 16)
+        )
+
+        seq = batch[-1]
+
+        assert type(seq) is ImageSequence
+        assert torch.equal(seq.tensor, batch.tensor[1])
+
+    def test_slice_returns_batched_image_sequence(self):
+        batch = BatchedImageSequence(
+            torch.arange(4 * 5 * 3 * 8 * 16).reshape(4, 5, 3, 8, 16)
+        )
+
+        sub = batch[1:3]
+
+        assert type(sub) is BatchedImageSequence
+        assert len(sub) == 2
+        assert torch.equal(sub.tensor[0], batch.tensor[1])
+        assert torch.equal(sub.tensor[1], batch.tensor[2])
+
+    def test_out_of_range_int_raises_index_error(self):
+        batch = BatchedImageSequence(torch.zeros(2, 5, 3, 8, 16))
+        with pytest.raises(IndexError):
+            _ = batch[2]
+
+
+class TestBatchedImageSequenceLen:
+    def test_len_is_leading_axis(self):
+        assert len(BatchedImageSequence(torch.zeros(2, 5, 3, 8, 16))) == 2
+
+    def test_len_of_empty_is_zero(self):
+        assert len(BatchedImageSequence(torch.zeros(0, 5, 3, 8, 16))) == 0
+
+
+class TestBatchedImageSequenceIter:
+    def test_iterates_entries_as_image_sequences(self):
+        batch = BatchedImageSequence(
+            torch.arange(2 * 5 * 3 * 8 * 16).reshape(2, 5, 3, 8, 16)
+        )
+
+        entries = list(batch)
+
+        assert len(entries) == 2
+        assert all(type(e) is ImageSequence for e in entries)
+        for i, entry in enumerate(entries):
+            assert torch.equal(entry.tensor, batch.tensor[i])
+
+    def test_iterates_empty_as_no_entries(self):
+        assert list(BatchedImageSequence(torch.zeros(0, 5, 3, 8, 16))) == []
+
+
+class TestBatchedImageSequenceDeviceTransfer:
+    def test_device_reflects_tensor(self):
+        assert BatchedImageSequence(torch.zeros(2, 5, 3, 8, 16)).device == torch.device(
+            "cpu"
+        )
+
+    def test_device_available_for_empty_batch(self):
+        assert BatchedImageSequence(torch.zeros(0, 5, 3, 8, 16)).device == torch.device(
+            "cpu"
+        )
+
+    def test_to_returns_new_batch(self):
+        # `to` is not in-place: it returns a fresh BatchedImageSequence.
+        batch = BatchedImageSequence(torch.zeros(2, 5, 3, 8, 16))
+
+        result = batch.to("cpu")
+
+        assert type(result) is BatchedImageSequence
+        assert result is not batch
+        assert torch.equal(result.tensor, batch.tensor)
+
+    def test_to_accepts_torch_device(self):
+        batch = BatchedImageSequence(torch.zeros(2, 5, 3, 8, 16))
+
+        result = batch.to(torch.device("cpu"))
+
+        assert type(result) is BatchedImageSequence
+        assert torch.equal(result.tensor, batch.tensor)
