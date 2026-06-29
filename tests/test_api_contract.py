@@ -19,6 +19,7 @@ def test_exp_exports():
     expected = {
         "BatchedImageSequence",
         "ChannelFormat",
+        "Focus",
         "DeviceLike",
         "DeviceTransferMixin",
         "Image",
