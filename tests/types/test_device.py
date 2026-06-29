@@ -1,4 +1,4 @@
-"""Behaviour spec for ``exp.types.mixin.DeviceTransferMixin``.
+"""Behaviour spec for ``exp.types.device.DeviceTransferMixin``.
 
 The mixin is an ABC whose ``to`` / ``device`` members are abstract. The
 single behavioural pin here encodes the design decision that the mixin
@@ -8,7 +8,7 @@ not be directly instantiable.
 
 import pytest
 
-from exp.types.mixin import DeviceTransferMixin
+from exp.types.device import DeviceTransferMixin
 
 
 def test_mixin_cannot_be_instantiated():

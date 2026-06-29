@@ -1,5 +1,5 @@
+from .device import DeviceLike, DeviceTransferMixin, SupportsDeviceTransfer
 from .image import BatchedImageSequence, ChannelFormat, Image, ImageSequence
-from .mixin import DeviceLike, DeviceTransferMixin
 from .size import Size2d, size_2d_to_tuple
 
 __all__ = [
@@ -10,5 +10,6 @@ __all__ = [
     "Image",
     "ImageSequence",
     "Size2d",
+    "SupportsDeviceTransfer",
     "size_2d_to_tuple",
 ]

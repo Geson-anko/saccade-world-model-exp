@@ -9,7 +9,7 @@ import torchvision.transforms.v2.functional as F
 from torchvision.io import ImageReadMode, read_image
 from torchvision.transforms.v2.functional import InterpolationMode
 
-from .mixin import DeviceLike, DeviceTransferMixin
+from .device import DeviceLike, DeviceTransferMixin
 from .size import Size2d, size_2d_to_tuple
 
 # float メソッドが組み込み float をシャドウするため、型注釈用に別名を保持する。

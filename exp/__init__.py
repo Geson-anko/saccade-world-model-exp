@@ -6,6 +6,7 @@ from .types import (
     Image,
     ImageSequence,
     Size2d,
+    SupportsDeviceTransfer,
     size_2d_to_tuple,
 )
 
@@ -17,5 +18,6 @@ __all__ = [
     "Image",
     "ImageSequence",
     "Size2d",
+    "SupportsDeviceTransfer",
     "size_2d_to_tuple",
 ]

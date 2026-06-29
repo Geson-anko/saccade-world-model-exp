@@ -24,6 +24,7 @@ def test_exp_exports():
         "Image",
         "ImageSequence",
         "Size2d",
+        "SupportsDeviceTransfer",
         "size_2d_to_tuple",
     }
 
