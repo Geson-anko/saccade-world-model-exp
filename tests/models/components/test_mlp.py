@@ -1,4 +1,4 @@
-"""Behaviour spec for ``exp.models.mlp.Mlp``.
+"""Behaviour spec for ``exp.models.components.mlp.Mlp``.
 
 ``Mlp`` is a thin Linear-GELU-dropout-Linear-dropout block relocated out
 of ``vit.py``. The only contract worth pinning is its shape mapping
@@ -9,7 +9,7 @@ of torch internals, per the project testing strategy).
 
 import torch
 
-from exp.models.mlp import Mlp
+from exp.models.components.mlp import Mlp
 
 _IN_FEATURES = 6
 _HIDDEN_FEATURES = 24

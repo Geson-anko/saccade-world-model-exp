@@ -1,4 +1,4 @@
-"""Behaviour spec for ``exp.models.vit``.
+"""Behaviour spec for ``exp.models.components.vit``.
 
 Translates the approved spec for the 2D axial RoPE Vision Transformer
 encoder into executable form. Tests are written against the *spec*, not
@@ -20,7 +20,7 @@ Two surfaces are pinned:
 import pytest
 import torch
 
-from exp.models.vit import AxialRoPE, VisionTransformer
+from exp.models.components.vit import AxialRoPE, VisionTransformer
 
 # Small ViT config reused across VisionTransformer tests.
 # image 8x8, patch 4x4 -> grid 2x2 -> n_patches 4.

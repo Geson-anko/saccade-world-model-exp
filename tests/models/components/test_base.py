@@ -1,4 +1,4 @@
-"""Behaviour spec for ``exp.models.base.SequenceModel``.
+"""Behaviour spec for ``exp.models.components.base.SequenceModel``.
 
 Translates the approved spec for the sequence-model abstract base into
 executable form. Tests are written against the *spec* of the public
@@ -24,7 +24,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from exp.models.base import SequenceModel
+from exp.models.components.base import SequenceModel
 
 # Small feature dim reused across the fakes and inputs.
 _DIM = 4
