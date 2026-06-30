@@ -31,6 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         unzip \
         tar \
+        tmux \
         procps \
         openssh-client \
         bash-completion \
