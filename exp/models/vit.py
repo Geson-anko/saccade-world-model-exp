@@ -76,6 +76,7 @@ class AxialRoPE(nn.Module):
         head_dim: int,
         grid_hw: tuple[int, int],
         theta: float = 10000.0,
+        num_prefix_tokens: int = 0,
     ) -> None:
         super().__init__()
         if head_dim % 4 != 0:
@@ -103,7 +104,15 @@ class AxialRoPE(nn.Module):
         axis_angle_x = torch.cat([angle_x, angle_x], dim=-1)
         angle = torch.cat([axis_angle_y, axis_angle_x], dim=-1)  # (n_patches, head_dim)
 
-        cos = angle.cos()[None, None]  # (1, 1, n_patches, head_dim)
+        # prefix トークン (CLS など) は空間位置を持たないので回転しない。角度 0 の行
+        # を先頭に連結 (cos=1, sin=0 → 恒等回転) する。
+        if num_prefix_tokens > 0:
+            prefix = torch.zeros(num_prefix_tokens, head_dim, dtype=torch.float32)
+            angle = torch.cat(
+                [prefix, angle], dim=0
+            )  # (num_prefix + n_patches, head_dim)
+
+        cos = angle.cos()[None, None]  # (1, 1, num_prefix + n_patches, head_dim)
         sin = angle.sin()[None, None]
         self.register_buffer("cos", cos, persistent=False)
         self.register_buffer("sin", sin, persistent=False)
@@ -135,6 +144,7 @@ class Attention(nn.Module):
         qkv_bias: bool = True,
         attn_drop: float = 0.0,
         proj_drop: float = 0.0,
+        num_prefix_tokens: int = 0,
     ) -> None:
         super().__init__()
         self.num_heads = num_heads
@@ -143,7 +153,9 @@ class Attention(nn.Module):
         self.qkv = nn.Linear(embed_dim, embed_dim * 3, bias=qkv_bias)
         self.proj = nn.Linear(embed_dim, embed_dim)
         self.proj_drop = nn.Dropout(proj_drop)
-        self.rope = AxialRoPE(self.head_dim, grid_hw)
+        self.rope = AxialRoPE(
+            self.head_dim, grid_hw, num_prefix_tokens=num_prefix_tokens
+        )
 
     @override
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -178,6 +190,7 @@ class Block(nn.Module):
         qkv_bias: bool = True,
         dropout: float = 0.0,
         attn_drop: float = 0.0,
+        num_prefix_tokens: int = 0,
     ) -> None:
         super().__init__()
         self.norm1 = nn.LayerNorm(embed_dim, eps=1e-6)
@@ -188,6 +201,7 @@ class Block(nn.Module):
             qkv_bias=qkv_bias,
             attn_drop=attn_drop,
             proj_drop=dropout,
+            num_prefix_tokens=num_prefix_tokens,
         )
         self.norm2 = nn.LayerNorm(embed_dim, eps=1e-6)
         self.mlp = Mlp(embed_dim, int(embed_dim * mlp_ratio), embed_dim, dropout)
@@ -223,8 +237,9 @@ def _fix_init_weight(attn_proj: nn.Linear, mlp_out: nn.Linear, layer_id: int) ->
 class VisionTransformer(nn.Module):
     """画像を符号化する Vision Transformer。
 
-    任意の leading batch 次元 (*, C, H, W) を受け取り (*, n_patches, embed_dim)
-    を返す。位置符号は 2D axial RoPE。
+    任意の leading batch 次元 (*, C, H, W) を受け取り (*, n_patches + 1,
+    embed_dim) を返す。先頭 (index 0) は集約用の CLS トークンで、以降がパッチ。位置符号は 2D axial
+    RoPE (CLS は恒等回転)。
     """
 
     # nn.Module.__call__ は Any を返すため、forward の型を呼び出し側へ伝える
@@ -250,6 +265,7 @@ class VisionTransformer(nn.Module):
         self.grid_hw: tuple[int, int] = self.patch_embed.grid_hw
         self.n_patches: int = self.patch_embed.num_patches
         self.embed_dim: int = embed_dim
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.blocks = nn.ModuleList(
             [
                 Block(
@@ -260,6 +276,7 @@ class VisionTransformer(nn.Module):
                     qkv_bias,
                     dropout,
                     attn_drop,
+                    num_prefix_tokens=1,
                 )
                 for _ in range(depth)
             ]
@@ -270,13 +287,17 @@ class VisionTransformer(nn.Module):
         for i, blk in enumerate(self.blocks):
             assert isinstance(blk, Block)
             _fix_init_weight(blk.attn.proj, blk.mlp.fc2, i + 1)
+        # cls_token は Parameter なので self.apply(init_weights) が触らない。明示初期化。
+        nn.init.trunc_normal_(self.cls_token, std=init_std)
 
     @override
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         *lead, c, h, w = x.shape
         xf = x.reshape(math.prod(lead), c, h, w)  # math.prod(()) == 1
-        t = self.patch_embed(xf)
+        t = self.patch_embed(xf)  # (N, n_patches, embed_dim)
+        cls = self.cls_token.expand(t.shape[0], -1, -1)  # (N, 1, embed_dim)
+        t = torch.cat([cls, t], dim=1)  # (N, n_patches + 1, embed_dim) index0=CLS
         for blk in self.blocks:
             t = blk(t)
         t = self.norm(t)
-        return t.reshape(*lead, self.n_patches, self.embed_dim)
+        return t.reshape(*lead, self.n_patches + 1, self.embed_dim)

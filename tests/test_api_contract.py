@@ -18,6 +18,7 @@ def test_exp_exports():
     # is exactly these symbols, and each is actually present.
     expected = {
         "BatchedImageSequence",
+        "BatchedLatentSequence",
         "ChannelFormat",
         "Focus",
         "DeviceLike",

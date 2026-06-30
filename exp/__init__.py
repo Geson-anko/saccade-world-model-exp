@@ -1,5 +1,6 @@
 from .types import (
     BatchedImageSequence,
+    BatchedLatentSequence,
     ChannelFormat,
     DeviceLike,
     DeviceTransferMixin,
@@ -13,6 +14,7 @@ from .types import (
 
 __all__ = [
     "BatchedImageSequence",
+    "BatchedLatentSequence",
     "ChannelFormat",
     "DeviceLike",
     "DeviceTransferMixin",

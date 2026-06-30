@@ -8,10 +8,13 @@ mocking of torch internals, per the project testing strategy).
 Two surfaces are pinned:
 - ``AxialRoPE`` — the mathematical contract of an orthogonal,
   relative-position rotary embedding (norm preservation, identity at the
-  grid origin, translation invariance of rotated dot products).
+  grid origin, translation invariance of rotated dot products) and the
+  identity rotation of prepended prefix (CLS) tokens.
 - ``VisionTransformer`` — the shape contract over arbitrary leading
-  batch dims, constructor validation, gradient flow, eval determinism,
-  and ``torch.compile`` parity (executability guarantee).
+  batch dims (now ``n_patches + 1`` output tokens with a leading CLS
+  token at index 0), constructor validation, gradient flow into the CLS
+  token, eval determinism, and ``torch.compile`` parity (executability
+  guarantee).
 """
 
 import pytest
@@ -29,6 +32,9 @@ _EMBED_DIM = 16
 _DEPTH = 2
 _NUM_HEADS = 2
 _N_PATCHES = 4
+# The ViT prepends a single CLS token (index 0), so the output sequence
+# length is n_patches + 1.
+_N_TOKENS = _N_PATCHES + 1
 
 
 def _make_vit():
@@ -64,6 +70,19 @@ class TestAxialRoPEMath:
         out = rope(q)
 
         torch.testing.assert_close(out[:, :, 0, :], q[:, :, 0, :])
+
+    def test_prefix_token_row_is_identity_rotation(self):
+        # With num_prefix_tokens=1 a zero-angle row is prepended for the CLS
+        # token, which carries no spatial position and must not be rotated.
+        # The sequence is then [prefix, patch_0, ..., patch_{n-1}], so index 0
+        # (the prefix row) must pass through unchanged for arbitrary input.
+        torch.manual_seed(0)
+        rope = AxialRoPE(head_dim=8, grid_hw=(2, 2), num_prefix_tokens=1)
+        x = torch.randn(1, 1, 5, 8)  # (B, heads, num_prefix + n_patches, head_dim)
+
+        out = rope(x)
+
+        torch.testing.assert_close(out[:, :, 0, :], x[:, :, 0, :])
 
     def test_dot_product_invariant_under_joint_translation(self):
         # RoPE relative-position property: <R(p)q, R(p')k> = <q, R(p'-p)k>.
@@ -106,25 +125,26 @@ class TestAxialRoPEMath:
 
 class TestVisionTransformerShape:
     def test_no_leading_batch(self):
-        # (C, H, W) -> (n_patches, embed_dim): empty leading batch.
+        # (C, H, W) -> (n_patches + 1, embed_dim): empty leading batch, CLS
+        # token prepended.
         model = _make_vit()
         out = model(torch.randn(_IN_CHANNELS, _IMAGE_SIZE, _IMAGE_SIZE))
 
-        assert out.shape == (_N_PATCHES, _EMBED_DIM)
+        assert out.shape == (_N_TOKENS, _EMBED_DIM)
 
     def test_single_leading_batch(self):
-        # (B, C, H, W) -> (B, n_patches, embed_dim).
+        # (B, C, H, W) -> (B, n_patches + 1, embed_dim).
         model = _make_vit()
         out = model(torch.randn(5, _IN_CHANNELS, _IMAGE_SIZE, _IMAGE_SIZE))
 
-        assert out.shape == (5, _N_PATCHES, _EMBED_DIM)
+        assert out.shape == (5, _N_TOKENS, _EMBED_DIM)
 
     def test_two_leading_batch_dims(self):
-        # (T, B, C, H, W) -> (T, B, n_patches, embed_dim): flatten/unflatten.
+        # (T, B, C, H, W) -> (T, B, n_patches + 1, embed_dim): flatten/unflatten.
         model = _make_vit()
         out = model(torch.randn(2, 5, _IN_CHANNELS, _IMAGE_SIZE, _IMAGE_SIZE))
 
-        assert out.shape == (2, 5, _N_PATCHES, _EMBED_DIM)
+        assert out.shape == (2, 5, _N_TOKENS, _EMBED_DIM)
 
     def test_exposes_n_patches_and_embed_dim(self):
         # Attributes are part of the public contract (used downstream).
@@ -172,6 +192,19 @@ class TestVisionTransformerBehaviour:
         grads = [p.grad for p in model.parameters() if p.grad is not None]
         assert grads, "no parameter received a gradient"
         assert any(g.abs().sum() > 0 for g in grads)
+
+    def test_backward_populates_cls_token_gradient(self):
+        # The CLS token is the downstream aggregation handle (index 0 of the
+        # output). A scalar loss must flow gradient into cls_token, proving the
+        # token actually participates in the forward computation rather than
+        # being a dangling parameter.
+        torch.manual_seed(0)
+        model = _make_vit()
+        x = torch.randn(2, _IN_CHANNELS, _IMAGE_SIZE, _IMAGE_SIZE)
+
+        model(x).sum().backward()
+
+        assert model.cls_token.grad is not None
 
     def test_eval_is_deterministic(self):
         # In eval mode dropout is disabled, so repeated forwards must match.
