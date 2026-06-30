@@ -27,6 +27,7 @@ def test_exp_exports():
         "DeviceTransferMixin",
         "Image",
         "ImageSequence",
+        "ScalarTensor",
         "Size2d",
         "SupportsDeviceTransfer",
         "size_2d_to_tuple",

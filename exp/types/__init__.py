@@ -3,6 +3,7 @@ from .focus import BatchedFocusSequence, Focus, FocusSequence
 from .image import BatchedImageSequence, ChannelFormat, Image, ImageSequence
 from .latent import BatchedLatentSequence
 from .size import Size2d, size_2d_to_tuple
+from .tensor import ScalarTensor
 
 __all__ = [
     "BatchedFocusSequence",
@@ -15,6 +16,7 @@ __all__ = [
     "FocusSequence",
     "Image",
     "ImageSequence",
+    "ScalarTensor",
     "Size2d",
     "SupportsDeviceTransfer",
     "size_2d_to_tuple",
