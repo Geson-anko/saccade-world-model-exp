@@ -241,6 +241,24 @@ class TestFocusSequenceDeviceTransfer:
         assert torch.equal(result.tensor, seq.tensor)
 
 
+class TestFocusSequenceIter:
+    def test_iterates_rows_as_focuses(self):
+        # Iteration yields one Focus per row, in order; each rebuilt Focus's
+        # tensor() round-trips to the stored row (float32 conversion is exact).
+        focuses = [_focus_row(0), _focus_row(1), _focus_row(2)]
+        seq = FocusSequence.from_focuses(focuses)
+
+        items = list(seq)
+
+        assert len(items) == 3
+        assert all(type(f) is Focus for f in items)
+        for i, focus in enumerate(items):
+            assert torch.equal(focus.tensor(), seq.tensor[i])
+
+    def test_iterates_empty_as_no_focuses(self):
+        assert list(FocusSequence(torch.zeros(0, 3))) == []
+
+
 class TestFocusSequenceApply:
     def test_returns_image_sequence_with_one_frame_per_focus(self):
         # apply maps each of the 3 focuses to one observation frame.
@@ -437,3 +455,20 @@ class TestBatchedFocusSequenceDeviceTransfer:
 
         assert type(result) is BatchedFocusSequence
         assert torch.equal(result.tensor, batch.tensor)
+
+
+class TestBatchedFocusSequenceIter:
+    def test_iterates_entries_as_focus_sequences(self):
+        # Iteration yields one FocusSequence per batch entry, in order.
+        sequences = [_distinct_focus_sequence(0), _distinct_focus_sequence(1)]
+        batch = BatchedFocusSequence.from_sequences(sequences)
+
+        items = list(batch)
+
+        assert len(items) == 2
+        assert all(type(e) is FocusSequence for e in items)
+        for i, entry in enumerate(items):
+            assert torch.equal(entry.tensor, batch.tensor[i])
+
+    def test_iterates_empty_as_no_entries(self):
+        assert list(BatchedFocusSequence(torch.zeros(0, 5, 3))) == []

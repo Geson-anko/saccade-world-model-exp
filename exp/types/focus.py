@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from typing import final, override
 
 import attrs
@@ -74,6 +74,9 @@ class FocusSequence(DeviceTransferMixin):
                 f"ndim={self.tensor.ndim} shape={tuple(self.tensor.shape)}"
             )
 
+    def __iter__(self) -> Iterator[Focus]:
+        return (Focus((float(x), float(y)), float(z)) for x, y, z in self.tensor)
+
     @property
     @override
     def device(self) -> torch.device:
@@ -112,10 +115,7 @@ class FocusSequence(DeviceTransferMixin):
         空列は from_images が弾く (C を決められないため)。値域不正テンソルは Focus 構築時に
         ValueError。
         """
-        return ImageSequence.from_images(
-            Focus((float(x), float(y)), float(z))(image).resize(size)
-            for x, y, z in self.tensor
-        )
+        return ImageSequence.from_images(focus(image).resize(size) for focus in self)
 
 
 @final
@@ -134,6 +134,9 @@ class BatchedFocusSequence(DeviceTransferMixin):
                 f"BatchedFocusSequence expects a (batch, seq, 3) tensor, got "
                 f"ndim={self.tensor.ndim} shape={tuple(self.tensor.shape)}"
             )
+
+    def __iter__(self) -> Iterator[FocusSequence]:
+        return (FocusSequence(seq) for seq in self.tensor)
 
     @property
     @override
