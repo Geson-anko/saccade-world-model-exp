@@ -25,6 +25,7 @@ import torch
 import torch.nn as nn
 
 from exp.models.base import SequenceModel
+from tests.helpers import parametrize_device
 
 # Small feature dim reused across the fakes and inputs.
 _DIM = 4
@@ -251,3 +252,19 @@ class TestSequenceModelStep:
 
         assert out.shape == x_t.shape
         assert hidden is None
+
+
+class TestSequenceModelDevice:
+    # Smoke test: the @final validation wrappers must pass device through, so
+    # forward over a concrete fake keeps output and hidden on each device.
+
+    @parametrize_device
+    def test_forward_output_on_device(self, device: str):
+        torch.manual_seed(0)
+        model = _EchoSequenceModel().to(device)
+        x = torch.randn(2, 3, _DIM, device=device)
+
+        out, hidden = model(x)
+
+        assert out.device == torch.device(device)
+        assert hidden.device == torch.device(device)

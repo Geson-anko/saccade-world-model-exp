@@ -31,6 +31,7 @@ import pytest
 import torch
 
 from exp.models.mingru import MinGRU, MinGRULayer
+from tests.helpers import parametrize_device
 
 _INPUT_DIM = 4
 _HIDDEN_DIM = 6
@@ -320,3 +321,30 @@ class TestMinGRUCompile:
             pytest.skip(f"torch.compile unavailable in this environment: {exc}")
 
         torch.testing.assert_close(compiled_out, eager_out)
+
+
+class TestMinGRUDevice:
+    # Smoke test: both forward (log-space scan) and step (plain recurrence)
+    # must compute on each device and keep output/hidden there.
+
+    @parametrize_device
+    def test_forward_output_on_device(self, device: str):
+        torch.manual_seed(0)
+        model = MinGRU(_DIM, _DEPTH).to(device)
+        x = torch.randn(2, _SEQ_LEN, _DIM, device=device)
+
+        out, h_last = model(x)
+
+        assert out.device == torch.device(device)
+        assert h_last.device == torch.device(device)
+
+    @parametrize_device
+    def test_step_output_on_device(self, device: str):
+        torch.manual_seed(0)
+        model = MinGRU(_DIM, _DEPTH).to(device)
+        x_t = torch.randn(2, _DIM, device=device)
+
+        out, h_last = model.step(x_t)
+
+        assert out.device == torch.device(device)
+        assert h_last.device == torch.device(device)

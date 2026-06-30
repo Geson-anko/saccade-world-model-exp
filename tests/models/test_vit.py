@@ -21,6 +21,7 @@ import pytest
 import torch
 
 from exp.models.vit import AxialRoPE, VisionTransformer
+from tests.helpers import parametrize_device
 
 # Small ViT config reused across VisionTransformer tests.
 # image 8x8, patch 4x4 -> grid 2x2 -> n_patches 4.
@@ -240,3 +241,19 @@ class TestVisionTransformerCompile:
             pytest.skip(f"torch.compile unavailable in this environment: {exc}")
 
         torch.testing.assert_close(compiled_out, eager_out)
+
+
+class TestVisionTransformerDevice:
+    # Smoke test: forward must compute on each device and land its output
+    # there. Pins device-following of the AxialRoPE cos/sin buffers.
+
+    @parametrize_device
+    def test_forward_output_on_device(self, device: str):
+        torch.manual_seed(0)
+        model = _make_vit().to(device)
+        x = torch.randn(2, _IN_CHANNELS, _IMAGE_SIZE, _IMAGE_SIZE, device=device)
+
+        out = model(x)
+
+        assert out.device == torch.device(device)
+        assert out.shape == (2, _N_TOKENS, _EMBED_DIM)
