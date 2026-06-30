@@ -17,6 +17,7 @@ exercised here.
 
 import pytest
 import torch
+
 from exp.types.latent import BatchedLatentSequence
 
 

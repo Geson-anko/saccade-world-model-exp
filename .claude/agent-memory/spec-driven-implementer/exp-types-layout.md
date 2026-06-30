@@ -20,6 +20,18 @@ metadata:
   `eq=True` で値等価が自然。`__call__(image: Image) -> Image` で正方切り取り、
   `tensor() -> (3,) float32` で行動ベクトル [x, y, zoom] を返す。crop ロジックは
   旧 `Image.focus` から移設 (Image.focus は削除済み)。
+  zoom 値域は `[0, 1]` (2026-06-30 に `(0, 1]` から拡張、zoom=0 は crop
+  `max(1, round(zoom·s))` で 1px に解決される)。
+  同ファイルに `FocusSequence` (seq,3) / `BatchedFocusSequence` (batch,seq,3) も同居。
+  これらは tensor 内包型なので image.py の系列型と同じ `@final
+  @attrs.define(slots=True,frozen=True,eq=False)` + `DeviceTransferMixin` 構成。
+  値域判定はモジュール private helper `_focus_tensor_is_valid(t)` に集約し
+  両クラスの `is_valid()`/`validate()` が共有。`validate()` は値域外で
+  ValueError (substring `out of range`)。`FocusSequence.from_focuses` /
+  `BatchedFocusSequence.from_sequences` は image.py の from_* をミラー。
+  `FocusSequence.apply(image, size)` は各行を `Focus` に戻して crop→resize し
+  `ImageSequence.from_images` 化 (空列は from_images が弾く)。
+  `BatchedFocusSequence` は apply も走査面 (__len__/__getitem__/__iter__) も持たない。
 
 **Why:** 仕様 (2026-06-27, image-types / 2026-06-29, focus 値オブジェクト化) の確定事項。
 **How to apply:** 同種の値オブジェクトを追加するときはこの構成に揃える。
