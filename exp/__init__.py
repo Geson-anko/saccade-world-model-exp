@@ -1,10 +1,12 @@
 from .types import (
+    BatchedFocusSequence,
     BatchedImageSequence,
     BatchedLatentSequence,
     ChannelFormat,
     DeviceLike,
     DeviceTransferMixin,
     Focus,
+    FocusSequence,
     Image,
     ImageSequence,
     Size2d,
@@ -13,12 +15,14 @@ from .types import (
 )
 
 __all__ = [
+    "BatchedFocusSequence",
     "BatchedImageSequence",
     "BatchedLatentSequence",
     "ChannelFormat",
     "DeviceLike",
     "DeviceTransferMixin",
     "Focus",
+    "FocusSequence",
     "Image",
     "ImageSequence",
     "Size2d",

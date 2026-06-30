@@ -17,10 +17,12 @@ def test_exp_exports():
     # Contract pin (not a behaviour test): the public export surface of `exp`
     # is exactly these symbols, and each is actually present.
     expected = {
+        "BatchedFocusSequence",
         "BatchedImageSequence",
         "BatchedLatentSequence",
         "ChannelFormat",
         "Focus",
+        "FocusSequence",
         "DeviceLike",
         "DeviceTransferMixin",
         "Image",
@@ -48,3 +50,5 @@ def test_sequence_types_are_device_transfer_mixins():
     # Image's DeviceTransferMixin base, which external code may rely on.
     assert issubclass(exp.ImageSequence, exp.DeviceTransferMixin)
     assert issubclass(exp.BatchedImageSequence, exp.DeviceTransferMixin)
+    assert issubclass(exp.FocusSequence, exp.DeviceTransferMixin)
+    assert issubclass(exp.BatchedFocusSequence, exp.DeviceTransferMixin)
