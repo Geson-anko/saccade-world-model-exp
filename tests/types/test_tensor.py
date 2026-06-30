@@ -3,8 +3,8 @@
 Translates the approved spec for the immutable ``ScalarTensor`` value
 object into executable form. ``ScalarTensor`` wraps a single-element
 tensor (the loss-value return type), normalising it to shape ``()``
-while preserving the autograd path, and exposes ``float`` / ``int``
-casts.
+while preserving the autograd path, and exposes an ``item()`` float
+accessor for logging.
 
 These are written against the *spec*, not any implementation: a
 divergent implementation should make them red. Tensors are constructed
@@ -54,14 +54,20 @@ class TestConstruction:
         assert "2" in str(exc.value) and "3" in str(exc.value)
 
 
-class TestScalarCasts:
-    def test_float_returns_python_float_value(self):
-        # float(st) yields the contained scalar as a Python float.
-        assert float(ScalarTensor(torch.tensor(3.5))) == 3.5
+class TestItem:
+    def test_item_returns_python_float_value(self):
+        # item() yields the contained scalar as a Python float.
+        result = ScalarTensor(torch.tensor(3.5)).item()
 
-    def test_int_truncates_toward_zero(self):
-        # int(st) follows Python/torch int() semantics: truncation.
-        assert int(ScalarTensor(torch.tensor(3.9))) == 3
+        assert result == 3.5
+        assert isinstance(result, float)
+
+    def test_item_returns_float_even_for_integer_tensor(self):
+        # The contract is item() -> float, so an int tensor still yields float.
+        result = ScalarTensor(torch.tensor(3)).item()
+
+        assert result == 3.0
+        assert isinstance(result, float)
 
 
 class TestGradientFlow:

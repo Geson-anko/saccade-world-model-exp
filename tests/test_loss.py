@@ -115,6 +115,18 @@ class TestMSELossShapeValidation:
 
 
 class TestMSELossInfo:
+    def test_output_is_scalar_loss_as_float(self):
+        # info["output"] mirrors the first return (the MSE value) as a float.
+        mse = MSELoss()
+        pred = _latent(torch.zeros(2, 3, 4))
+        target = _latent(torch.ones(2, 3, 4))
+
+        value, info = mse(pred, target)
+
+        assert isinstance(info["output"], float)
+        torch.testing.assert_close(info["output"], value.item())
+        assert info["output"] == 1.0
+
     def test_elementwise_has_batch_seq_shape(self):
         # info["elementwise"] is the per-position MSE -> shape (B, S).
         mse = MSELoss()
@@ -216,7 +228,7 @@ class TestSIGRegValue:
 
         value, info = sig(emb)
 
-        torch.testing.assert_close(float(value), info["output"])
+        torch.testing.assert_close(value.item(), info["output"])
 
 
 class TestSIGRegGammaScaling:
@@ -325,7 +337,7 @@ class TestSIGRegStochasticProjection:
         _ = torch.randn(1000)
         second, _ = sig(emb)
 
-        assert float(first) != float(second)
+        assert first.item() != second.item()
 
     def test_matched_seed_repeats_coincide(self):
         # Pinning the same seed before each call reproduces the projection

@@ -11,8 +11,9 @@ __all__ = ["MSELoss", "SIGReg", "MSELossInfo", "SIGRegInfo"]
 
 
 class MSELossInfo(TypedDict):
-    """MSELoss の記録/デバッグ専用 info。tensor は detach 済み。"""
+    """MSELoss の記録/デバッグ専用 info。tensor は detach、scalar は float 化済み。"""
 
+    output: float  # MSE 値 (第 1 戻り値の float)
     # (B, S) detached: 位置ごとの MSE = ((pred-target)**2).mean(-1)
     elementwise: torch.Tensor
 
@@ -54,7 +55,10 @@ class MSELoss:
             )
         diff2 = (prediction.tensor - target.tensor) ** 2  # (B, S, D)
         value = diff2.mean() if self.reduction == "mean" else diff2.sum()
-        info: MSELossInfo = {"elementwise": diff2.mean(dim=-1).detach()}  # (B, S)
+        info: MSELossInfo = {
+            "output": float(value),
+            "elementwise": diff2.mean(dim=-1).detach(),  # (B, S)
+        }
         return ScalarTensor(value), info
 
 
