@@ -1,4 +1,4 @@
-"""Behaviour spec for ``exp.models.norm.RMSNorm``.
+"""Behaviour spec for ``exp.models.components.norm.RMSNorm``.
 
 Translates the spec for root-mean-square layer normalisation into
 executable form. ``RMSNorm(dim, *, eps=1e-6)`` applies ``x *
@@ -10,7 +10,7 @@ torch internals, per the project testing strategy).
 
 import torch
 
-from exp.models.norm import RMSNorm
+from exp.models.components.norm import RMSNorm
 
 _DIM = 8
 

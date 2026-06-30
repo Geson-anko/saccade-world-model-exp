@@ -14,8 +14,8 @@ from exp.types.image import BatchedImageSequence
 from exp.types.latent import BatchedLatentSequence
 from exp.types.size import Size2d
 
-from .vit import VisionTransformer
-from .weight import init_weights
+from .components.vit import VisionTransformer
+from .components.weight import init_weights
 
 __all__ = ["ImageEncoder"]
 
