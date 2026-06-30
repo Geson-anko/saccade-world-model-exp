@@ -1,4 +1,4 @@
-"""Behaviour spec for ``exp.models.weight``.
+"""Behaviour spec for ``exp.models.components.weight``.
 
 Translates the approved spec for weight initialisation helpers into
 executable form. Tests are written against the *spec*, not any
@@ -12,7 +12,7 @@ implementation, on real CPU torch modules (no mocking of torch).
 import torch
 from torch import nn
 
-from exp.models.weight import init_weights
+from exp.models.components.weight import init_weights
 
 
 class TestInitWeights:

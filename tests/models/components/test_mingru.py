@@ -1,4 +1,4 @@
-"""Behaviour spec for ``exp.models.mingru``.
+"""Behaviour spec for ``exp.models.components.mingru``.
 
 Translates the approved minGRU spec (Feng et al. 2024, arXiv:2410.01201)
 into executable form. Tests are written against the *spec*, not any
@@ -23,14 +23,14 @@ to ~1 (large positive bias) or ~0 (large negative bias), independent of the
 input.
 
 Base-class contract (``forward``/``step`` shape validation and the ``@final``
-wrappers) is already covered by ``tests/models/test_base.py`` and is not
+wrappers) is already covered by ``tests/models/components/test_base.py`` and is not
 re-tested here.
 """
 
 import pytest
 import torch
 
-from exp.models.mingru import MinGRU, MinGRULayer
+from exp.models.components.mingru import MinGRU, MinGRULayer
 from tests.helpers import parametrize_device
 
 _INPUT_DIM = 4
