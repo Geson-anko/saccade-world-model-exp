@@ -28,6 +28,11 @@ class SequenceModel[THidden](nn.Module, abc.ABC):
     はモデル依存のため本契約には含めない。
     """
 
+    @property
+    @abc.abstractmethod
+    def dim(self) -> int:
+        """入出力の特徴次元 (最後の軸のサイズ)。"""
+
     def __call__(
         self, x: torch.Tensor, hidden: THidden | None = None
     ) -> tuple[torch.Tensor, THidden]:

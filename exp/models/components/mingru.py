@@ -193,7 +193,7 @@ class MinGRU(SequenceModel[torch.Tensor]):
             raise ValueError(f"dim must be positive, got {dim}")
         if depth <= 0:
             raise ValueError(f"depth must be positive, got {depth}")
-        self.dim: int = dim
+        self._dim = dim
         self.depth: int = depth
         self.blocks = nn.ModuleList(
             [
@@ -206,6 +206,11 @@ class MinGRU(SequenceModel[torch.Tensor]):
         self.norm = RMSNorm(dim)
 
         self.apply(partial(init_weights, init_std=init_std))
+
+    @property
+    @override
+    def dim(self) -> int:
+        return self._dim
 
     def _run_blocks(
         self,
