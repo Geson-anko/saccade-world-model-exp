@@ -18,12 +18,25 @@ import pytest
 import torch
 
 from exp.types.elements.focus import (
+    FOCUS_DIM,
     BatchedFocus,
     BatchedFocusSequence,
     Focus,
     FocusSequence,
 )
 from exp.types.elements.image import Image, ImageSequence
+
+
+class TestFocusDim:
+    """``FOCUS_DIM`` names the [x, y, zoom] width shared by the family."""
+
+    def test_focus_dim_is_three(self):
+        # The action row is [x, y, zoom]: exactly three components. Pinned as a
+        # semantic invariant (not a bare literal duplicate): downstream models
+        # concatenate FOCUS_DIM + latent_dim, so this width is part of the
+        # contract, and it must equal what a real Focus tensor actually carries.
+        assert FOCUS_DIM == 3
+        assert Focus.init((0.0, 0.0), 0.5).tensor.shape == (FOCUS_DIM,)
 
 
 class TestFocusInit:
