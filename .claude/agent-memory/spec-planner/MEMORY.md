@@ -1,2 +1,3 @@
 - [Image 値オブジェクトの設計判断](project_image_value_objects.md) — final 化・Self→具象型・from_* の空入力 ValueError("at least one") 契約
 - [テスト規約](project_testing_conventions.md) — real tensor / substring 検証 / 1対1ミラー / private 非テスト / api_contract ピン
+- [nn.Module.__call__ の型付け](project_module_call_typing.md) — Callable annotation trick / 複数対応は private Protocol overload / 分岐は match 文

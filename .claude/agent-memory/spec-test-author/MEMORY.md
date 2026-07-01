@@ -9,3 +9,4 @@
 - [tests/types stdlib collision](project_tests_types_stdlib_collision.md) — tests/types/ shadows stdlib `types`; collection breaks under default prepend mode, needs importmode=importlib
 - [tests/types package collision](feedback_tests_types_package_collision.md) — tests/types/** が stdlib `types` と衝突し collection error になる harness 問題と切り分け
 - [tests/types/ shadows stdlib](feedback_types_package_shadows_stdlib.md) — an __init__.py under tests/types/ names the pkg `types`, breaking collection suite-wide
+- [ImageEncoder overload spec](project_encoder_overload_spec.md) — rank-preserving __call__ (Image/Batched/Sequence/BatchedSequence); BatchNorm N=1 train constraint = ValueError
