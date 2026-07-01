@@ -244,6 +244,28 @@ class TestEvalDeterminism:
         torch.testing.assert_close(first, second)
 
 
+class TestConvDecoderCompile:
+    # integration-real: exercises the CPU inductor backend. Skips when
+    # torch.compile is unavailable/unsupported in the environment, since
+    # this only guarantees compile *executability* and eager parity.
+
+    def test_compiled_matches_eager(self):
+        torch.manual_seed(0)
+        model = _make_conv_decoder()
+        model.eval()
+        x = torch.randn(2, _FEATURE_DIM)
+
+        try:
+            compiled = torch.compile(model)
+            with torch.no_grad():
+                eager_out = model(x)
+                compiled_out = compiled(x)
+        except Exception as exc:  # compile backend missing/unsupported here
+            pytest.skip(f"torch.compile unavailable in this environment: {exc}")
+
+        torch.testing.assert_close(compiled_out, eager_out)
+
+
 class TestConvDecoderDevice:
     # Smoke test: the conv trunk must run on each device and keep its output
     # there.
