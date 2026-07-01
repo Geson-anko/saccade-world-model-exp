@@ -1,21 +1,21 @@
 ---
 name: project-focus-types
-description: exp/types/focus.py の public 面と設計不変条件。Focus 行動値オブジェクト + FocusSequence / BatchedFocusSequence の refactor 境界メモ
+description: exp/types/elements/focus.py の public 面と設計不変条件。Focus 行動値オブジェクト + FocusSequence / BatchedFocus / BatchedFocusSequence の refactor 境界メモ
 metadata:
   type: project
 ---
 
-`exp/types/focus.py` はサッカード行動 `a=(point, zoom)` の値オブジェクト群。[[project-types-package]] と同じ基盤層に属し、`image.py`（`ImageSequence`/`BatchedImageSequence`）が手本。
+`exp/types/elements/focus.py` はサッカード行動 `a=(point, zoom)` の値オブジェクト群。[[project-element-base]] の基底を継承し、image.py が手本。（旧パス `exp/types/focus.py` は 2026-06 の elements/ サブパッケージ移設で廃止）
 
 public 面（契約テストと spec テストでピン、絶対不変）:
-- `Focus`（`@attrs.define(frozen=True)`、eq=True で hashable）: `point: tuple[float,float]`・`zoom: float`、`tensor()`→`(3,)` float32 CPU、`__call__(image)→Image`（crop は `square_pad()` 後に実施）。
-- `FocusSequence`/`BatchedFocusSequence`（`@final` + `@attrs.define(slots=True, frozen=True, eq=False)` + `DeviceTransferMixin`）: `tensor` を内包、`(seq,3)`/`(batch,seq,3)`、`device`/`to`/`is_valid`/`validate`/`from_focuses`/`from_sequences`/`apply(image,size)`。空系列（要素0）は許容。
-- エラーメッセージ substring がテストで pin: `(seq, 3)` / `(batch, seq, 3)`（+ndim・shape）/ `out of range`（validate）/ `at least one`（from_* 空入力）/ Focus zoom の `[0, 1]`・point の `[-1, 1]`。
+- `Focus`（`@final`+`@attrs.define(slots=True,frozen=True,eq=False)`, Element 継承, `_SHAPE=[3]`）: `point`/`zoom` property、`init(point,zoom)`(値域検証つき classmethod)、`tensor` 属性→`(3,)` float32、`__call__(image)→Image`（`square_pad()` 後に crop）。Focus(tensor) 直接構築は shape のみ検証し値域は検証しない。
+- `FocusSequence`/`BatchedFocus`/`BatchedFocusSequence`（`_FocusValidation` mixin + base 収集型）: `_SHAPE=[...,3]`、`is_valid`/`validate`、`apply`(FocusSequence のみ)。空系列許容。
+- エラーメッセージ substring pin: `Focus point must be within [-1, 1]`/`Focus zoom must be within [0, 1]`（init）/`out of range`（validate）/base 由来 `(seq, 3)`/`(batch, 3)`/`(batch, seq, 3)`/`at least one ...`。
 
 設計不変条件:
-- **zoom は閉区間 [0, 1]**（point は [-1, 1]）。2026-06-30 に旧 `(0, 1]` から `[0, 1]` へ変更（zoom=0 を valid 下限として許容）。spec テスト `test_accepts_zero_zoom` が pin。
-- `_focus_tensor_is_valid(t)` が 2 クラスの唯一の検証 helper（point/zoom 範囲を 0-dim bool tensor の `&` で判定）。`validate` のエラーメッセージは 2 クラスで完全重複だが、手本 image.py の `from_images`/`from_sequences` と同流儀でクラスごとに独立保持（「2 回まで OK」・薄い helper 化は過剰）。
+- **zoom は閉区間 [0, 1]**（point は [-1, 1]）。2026-06-30 に旧 `(0, 1]` から `[0, 1]` へ変更。spec テストが pin。
+- `_FocusValidation` mixin が 3 収集クラスの唯一の検証実体（rule-of-three を満たす正当な mixin）。`is_valid` は point/zoom を 0-dim bool tensor の `&` で判定。`apply` は `focus(image).resize(size)` を `ImageSequence.from_elements(...)` に流す（crop ロジック再利用のため正しい）。
 
 **Why:** 系列モデルへ流す行動系列の基盤型。Hyrum's law 緩和で public 表面が契約・spec テストで固定。
 
-**How to apply:** refactor 時は上記 public シンボル名・シグネチャ・エラー substring・`DeviceTransferMixin` 継承・相対 import を変えない。命名/コメント密度/post_init メッセージ形式/`from_*` の `list()`→空チェック→`torch.stack` 構造は image.py に馴染ませる。2026-06-30 レビュー: `_focus_tensor_is_valid` を `point_ok`/`zoom_ok` の 2 行に分離（明示性）、`from_focuses`/`from_sequences` の内包表記変数を `f`/`s`→`focus`/`sequence` に揃えて image.py に一致（一貫性）。`apply` の `Focus(...)(image).resize(size)` 再構築は crop ロジック再利用のため正しく、保留。
+**How to apply:** refactor 時は上記 public シンボル名・シグネチャ・エラー substring・`DeviceTransferMixin`(base 経由) 継承・相対 import を変えない。2026-07-01 レビュー: (1) 単一呼び出し元しかない module-level `_focus_tensor_is_valid` を `is_valid` 本体へインライン化（過剰抽象化除去、private・非直テスト・呼び出し元1で安全）。(2) `__all__` を package 支配的な多行+trailing comma へ揃えた。docformatter が `_FocusValidation` docstring の `point∈`→`Point∈` 自動 capitalize・Focus docstring の zoom 行を折り返し（触れると自動発生・許容）。
