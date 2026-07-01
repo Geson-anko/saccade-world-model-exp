@@ -16,11 +16,14 @@ from .base import (
 from .image import Image, ImageSequence
 
 __all__ = [
+    "FOCUS_DIM",
     "BatchedFocus",
     "BatchedFocusSequence",
     "Focus",
     "FocusSequence",
 ]
+
+FOCUS_DIM = 3
 
 
 class _FocusValidation:
@@ -55,8 +58,8 @@ class Focus(_FocusValidation, Element):
     """
 
     _NDIM: ClassVar[int] = 1
-    _SHAPE_DESC: ClassVar[str] = "(3,)"
-    _SHAPE: ClassVar[list[int | None] | None] = [3]
+    _SHAPE_DESC: ClassVar[str] = f"({FOCUS_DIM},)"
+    _SHAPE: ClassVar[list[int | None] | None] = [FOCUS_DIM]
 
     @property
     def point(self) -> tuple[float, float]:
@@ -101,8 +104,8 @@ class FocusSequence(_FocusValidation, ElementSequence[Focus]):
     """
 
     _NDIM: ClassVar[int] = 2
-    _SHAPE_DESC: ClassVar[str] = "(seq, 3)"
-    _SHAPE: ClassVar[list[int | None] | None] = [None, 3]
+    _SHAPE_DESC: ClassVar[str] = f"(seq, {FOCUS_DIM})"
+    _SHAPE: ClassVar[list[int | None] | None] = [None, FOCUS_DIM]
 
     @classmethod
     @override
@@ -126,8 +129,8 @@ class BatchedFocus(_FocusValidation, BatchedElement[Focus]):
     """
 
     _NDIM: ClassVar[int] = 2
-    _SHAPE_DESC: ClassVar[str] = "(batch, 3)"
-    _SHAPE: ClassVar[list[int | None] | None] = [None, 3]
+    _SHAPE_DESC: ClassVar[str] = f"(batch, {FOCUS_DIM})"
+    _SHAPE: ClassVar[list[int | None] | None] = [None, FOCUS_DIM]
 
     @classmethod
     @override
@@ -146,8 +149,8 @@ class BatchedFocusSequence(
     """
 
     _NDIM: ClassVar[int] = 3
-    _SHAPE_DESC: ClassVar[str] = "(batch, seq, 3)"
-    _SHAPE: ClassVar[list[int | None] | None] = [None, None, 3]
+    _SHAPE_DESC: ClassVar[str] = f"(batch, seq, {FOCUS_DIM})"
+    _SHAPE: ClassVar[list[int | None] | None] = [None, None, FOCUS_DIM]
 
     @classmethod
     @override

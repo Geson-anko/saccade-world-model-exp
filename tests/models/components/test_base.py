@@ -44,6 +44,10 @@ class _EchoSequenceModel(SequenceModel[torch.Tensor]):
         super().__init__()
         self.lin = nn.Linear(_DIM, _DIM)
 
+    @property
+    def dim(self):
+        return _DIM
+
     def _forward(self, x, hidden=None):
         out = self.lin(x)
         if hidden is not None:
@@ -64,6 +68,10 @@ class _BadForwardShapeModel(SequenceModel[torch.Tensor]):
     ``THidden=Tensor``.
     """
 
+    @property
+    def dim(self):
+        return _DIM
+
     def _forward(self, x, hidden=None):
         return x[..., :-1], x[..., -1, :]
 
@@ -78,6 +86,10 @@ class _BadStepShapeModel(SequenceModel[torch.Tensor]):
     is a valid ``Tensor`` so the override matches ``THidden=Tensor``.
     """
 
+    @property
+    def dim(self):
+        return _DIM
+
     def _forward(self, x, hidden=None):
         return x, x[..., -1, :]
 
@@ -87,6 +99,10 @@ class _BadStepShapeModel(SequenceModel[torch.Tensor]):
 
 class _NoneHiddenModel(SequenceModel[None]):
     """``SequenceModel[None]`` fake: hooks return ``None`` as the hidden."""
+
+    @property
+    def dim(self):
+        return _DIM
 
     def _forward(self, x, hidden=None):
         return x, None
@@ -111,6 +127,21 @@ class TestSequenceModelContract:
 
         with pytest.raises(TypeError):
             _OnlyForward()  # type: ignore[abstract]
+
+    def test_subclass_missing_dim_cannot_be_instantiated(self):
+        # dim is an abstract property of the contract (downstream models size
+        # their projections from sequence_model.dim). Implementing both hooks
+        # but omitting dim leaves the subclass abstract, so it must not build.
+        # Symmetric to the hook-missing test above.
+        class _NoDim(SequenceModel[torch.Tensor]):
+            def _forward(self, x, hidden=None):
+                return x, x[..., -1, :]
+
+            def _step(self, x, hidden=None):
+                return x, x
+
+        with pytest.raises(TypeError):
+            _NoDim()  # type: ignore[abstract]
 
 
 class TestSequenceModelValidation:
