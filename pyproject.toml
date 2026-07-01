@@ -39,6 +39,7 @@ filterwarnings = [
 ]
 markers = [
   "api_contract: 公開 API 契約ピン (振る舞いテストではない)",
+  "gpu: CUDA GPU を必要とするテスト (利用可能な全 GPU でパラメタライズ; 非搭載環境では cpu のみ)",
 ]
 
 [tool.pyright]

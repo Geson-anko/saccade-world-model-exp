@@ -25,6 +25,7 @@ import torch
 from exp.models.encoder import ImageEncoder
 from exp.types.image import BatchedImageSequence
 from exp.types.latent import BatchedLatentSequence
+from tests.helpers import parametrize_device
 
 # Small but spec-valid config. image 32x32 with the fixed patch size 16
 # gives a 2x2 grid; latent_dim 8 keeps tensors tiny.
@@ -126,3 +127,17 @@ class TestValidation:
             ImageEncoder(
                 image_size=20, in_channels=_IN_CHANNELS, latent_dim=_LATENT_DIM
             )
+
+
+class TestImageEncoderDevice:
+    # Smoke test: the ViT -> Linear -> BatchNorm path must run on each device
+    # and return a latent whose tensor lands there.
+
+    @parametrize_device
+    def test_forward_output_on_device(self, device: str):
+        encoder = _make_encoder().to(device)
+        x = _make_input(batch=2, seq=3).to(device)
+
+        out = encoder(x)
+
+        assert out.tensor.device == torch.device(device)

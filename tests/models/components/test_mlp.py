@@ -10,6 +10,7 @@ of torch internals, per the project testing strategy).
 import torch
 
 from exp.models.components.mlp import Mlp
+from tests.helpers import parametrize_device
 
 _IN_FEATURES = 6
 _HIDDEN_FEATURES = 24
@@ -34,3 +35,17 @@ class TestMlpShape:
         out = mlp(torch.randn(2, 5, _IN_FEATURES))
 
         assert out.shape == (2, 5, _OUT_FEATURES)
+
+
+class TestMlpDevice:
+    # Smoke test: forward must compute on each device and land its output there.
+
+    @parametrize_device
+    def test_forward_output_on_device(self, device: str):
+        torch.manual_seed(0)
+        mlp = Mlp(_IN_FEATURES, _HIDDEN_FEATURES, _OUT_FEATURES).to(device)
+        x = torch.randn(2, 5, _IN_FEATURES, device=device)
+
+        out = mlp(x)
+
+        assert out.device == torch.device(device)

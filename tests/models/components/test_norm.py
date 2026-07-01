@@ -11,6 +11,7 @@ torch internals, per the project testing strategy).
 import torch
 
 from exp.models.components.norm import RMSNorm
+from tests.helpers import parametrize_device
 
 _DIM = 8
 
@@ -63,3 +64,17 @@ class TestRMSNormContract:
 
         rms = out.pow(2).mean(dim=-1).sqrt()
         torch.testing.assert_close(rms, torch.full((4,), scale), rtol=1e-3, atol=1e-3)
+
+
+class TestRMSNormDevice:
+    # Smoke test: forward must compute on each device and land its output there.
+
+    @parametrize_device
+    def test_forward_output_on_device(self, device: str):
+        torch.manual_seed(0)
+        norm = RMSNorm(_DIM).to(device)
+        x = torch.randn(2, 5, _DIM, device=device)
+
+        out = norm(x)
+
+        assert out.device == torch.device(device)
