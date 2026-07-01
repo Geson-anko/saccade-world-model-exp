@@ -6,3 +6,4 @@
 - [vit component](project_vit_component.md) — VisionTransformer / weight.py の public 面と RoPE 不変条件。refactor 境界メモ (components flatten 済み・Mlp は mlp.py へ移設)
 - [mingru component](project_mingru_component.md) — minGRU の public 面・log-space scan 数値不変条件・実施済み refactor の記録
 - [loss module](project_loss_module.md) — MSELoss / SIGReg functor の public 面・SIGReg 数値不変条件・実施済み refactor の記録
+- [predictor model](project_predictor_model.md) — Predictor 上位モデル + SequenceModel.dim 契約 + FOCUS_DIM 定数の public 面・forward match は明示のまま維持する判断
