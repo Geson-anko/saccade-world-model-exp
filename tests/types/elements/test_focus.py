@@ -86,6 +86,34 @@ class TestFocusTensor:
             Focus(torch.zeros(2))
 
 
+class TestFocusValidate:
+    """``Focus`` inherits the family range check: is_valid / validate."""
+
+    def test_in_range_is_valid(self):
+        assert Focus(torch.tensor([0.5, -0.5, 0.25])).is_valid()
+
+    def test_boundary_values_are_valid(self):
+        # point=±1 and zoom=0 / zoom=1 are all on the CLOSED-interval boundary.
+        assert Focus(torch.tensor([1.0, -1.0, 0.0])).is_valid()
+        assert Focus(torch.tensor([-1.0, 1.0, 1.0])).is_valid()
+
+    def test_out_of_range_point_is_invalid(self):
+        # point=1.5 exceeds the [-1, 1] bound.
+        assert not Focus(torch.tensor([1.5, 0.0, 0.5])).is_valid()
+
+    def test_out_of_range_zoom_is_invalid(self):
+        # zoom=1.2 exceeds the [0, 1] bound.
+        assert not Focus(torch.tensor([0.0, 0.0, 1.2])).is_valid()
+
+    def test_validate_passes_silently_when_in_range(self):
+        assert Focus(torch.tensor([0.0, 0.0, 0.5])).validate() is None
+
+    def test_validate_raises_when_out_of_range(self):
+        # validate() surfaces the out-of-range condition (substring match only).
+        with pytest.raises(ValueError, match="out of range"):
+            Focus(torch.tensor([0.0, 0.0, 1.2])).validate()
+
+
 class TestCall:
     """``Focus.__call__(image)`` square-crops per the (point, zoom) action."""
 

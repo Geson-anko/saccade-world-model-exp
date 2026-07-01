@@ -47,7 +47,7 @@ class _FocusValidation:
 
 @final
 @attrs.define(slots=True, frozen=True, eq=False)
-class Focus(Element):
+class Focus(_FocusValidation, Element):
     """画像の正方切り取りを指示する行動 a=(point, zoom)。
 
     tensor は (3,) の [x, y, zoom]。point は [-1, 1] (中心 0, y=+1 が下)、zoom は
