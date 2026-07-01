@@ -31,4 +31,26 @@ BatchedLatentSequence->BatchedImageSequence). Trunk = ConvDecoder
   tensor and expose `.tensor` / `.to(device)`.
 - No loss computation (exp.loss.MSELoss is Latent-family-typed, not images).
   Contract = shape/type/gradient/detach/validation/device only.
+
+**ConvDecoder (the trunk under ImageDecoder)** lives in
+`exp/models/components/conv_decoder.py`, re-exported from
+`exp.models.components` (`__all__=["ConvDecoder"]`) so it is a tested
+public component. Tests: `tests/models/components/test_conv_decoder.py`
+(mirror test_mingru.py style, raw tensors, no value objects). Contract:
+`forward(x)` maps `(*, feature_dim) -> (*, out_channels, s', s')`,
+arbitrary leading dims folded via `math.prod(lead) or 1` (so N=1 works,
+GroupNorm is batch-independent). `s' = init_spatial * 2**N` (square only;
+`init_spatial` scalar). `out_channels` is any positive int — NO
+ChannelFormat constraint (that check lives only in ImageDecoder). Construct
+ValueError when a side isn't `init_spatial*2**N` OR the per-side stage
+counts disagree (non-square, e.g. out_size=(8,16) with init_spatial=4).
+ValueError message contains "init_spatial" -> safe `match="init_spatial"`.
+`out_size` accepts int or (h,w) tuple via `size_2d_to_tuple`. Output linear
+(no range test). All green as of first write (no impl change needed).
+
+Pyright gotcha: a `_make_*` factory helper whose `out_size` (or any
+`Size2d`) default is an int gets inferred as `out_size: int`, so a test
+passing a `(n, n)` tuple fails `just type`. Annotate the helper param as
+`out_size: Size2d` (`from exp.types import Size2d`). tests/ isn't strict
+pyright but `just type` still runs over it.
 Related: [[project_encoder_overload_spec]], [[ruff-isort-missing-module]].
