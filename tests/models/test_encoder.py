@@ -23,7 +23,16 @@ import pytest
 import torch
 
 from exp.models.encoder import ImageEncoder
-from exp.types import BatchedImageSequence, BatchedLatentSequence
+from exp.types import (
+    BatchedImage,
+    BatchedImageSequence,
+    BatchedLatent,
+    BatchedLatentSequence,
+    Image,
+    ImageSequence,
+    Latent,
+    LatentSequence,
+)
 from tests.helpers import parametrize_device
 
 # Small but spec-valid config. image 32x32 with the fixed patch size 16
@@ -47,6 +56,24 @@ def _make_input(batch: int, seq: int) -> BatchedImageSequence:
     return BatchedImageSequence(
         torch.randn(batch, seq, _IN_CHANNELS, _IMAGE_SIZE, _IMAGE_SIZE)
     )
+
+
+def _make_image() -> Image:
+    # A single glimpse (C, H, W); reshape collapses it to N=1 rows.
+    torch.manual_seed(0)
+    return Image(torch.randn(_IN_CHANNELS, _IMAGE_SIZE, _IMAGE_SIZE))
+
+
+def _make_batched_image(batch: int) -> BatchedImage:
+    # A batch of glimpses (batch, C, H, W); reshape collapses it to N=batch.
+    torch.manual_seed(0)
+    return BatchedImage(torch.randn(batch, _IN_CHANNELS, _IMAGE_SIZE, _IMAGE_SIZE))
+
+
+def _make_image_sequence(seq: int) -> ImageSequence:
+    # A single glimpse sequence (len, C, H, W); reshape collapses it to N=len.
+    torch.manual_seed(0)
+    return ImageSequence(torch.randn(seq, _IN_CHANNELS, _IMAGE_SIZE, _IMAGE_SIZE))
 
 
 class TestForwardShape:
@@ -140,3 +167,124 @@ class TestImageEncoderDevice:
         out = encoder(x)
 
         assert out.tensor.device == torch.device(device)
+
+
+class TestRankPreservingReturnType:
+    # The call contract maps each input rank to the matching latent value
+    # object: the encoder must not up- or down-rank its output. Each glimpse
+    # of every rank still collapses to one latent vector. Run in eval() so the
+    # Image (N=1) case does not hit the train-mode BatchNorm constraint, which
+    # has its own dedicated test below.
+
+    def test_image_returns_latent(self):
+        encoder = _make_encoder().eval()
+
+        out = encoder(_make_image())
+
+        assert type(out) is Latent
+
+    def test_batched_image_returns_batched_latent(self):
+        encoder = _make_encoder().eval()
+
+        out = encoder(_make_batched_image(batch=2))
+
+        assert type(out) is BatchedLatent
+
+    def test_image_sequence_returns_latent_sequence(self):
+        encoder = _make_encoder().eval()
+
+        out = encoder(_make_image_sequence(seq=3))
+
+        assert type(out) is LatentSequence
+
+
+class TestRankPreservingShape:
+    # Each rank keeps its leading axes and replaces (C, H, W) with
+    # (latent_dim,): one latent per glimpse. (batch, seq) is already covered
+    # by TestForwardShape. Run in eval() for the same N=1 reason as above.
+
+    def test_image_shape(self):
+        # (C, H, W) -> (latent_dim,)
+        encoder = _make_encoder().eval()
+
+        out = encoder(_make_image())
+
+        assert out.tensor.shape == (_LATENT_DIM,)
+
+    def test_batched_image_shape(self):
+        # (batch, C, H, W) -> (batch, latent_dim)
+        encoder = _make_encoder().eval()
+
+        out = encoder(_make_batched_image(batch=2))
+
+        assert out.tensor.shape == (2, _LATENT_DIM)
+
+    def test_image_sequence_shape(self):
+        # (len, C, H, W) -> (seq, latent_dim)
+        encoder = _make_encoder().eval()
+
+        out = encoder(_make_image_sequence(seq=3))
+
+        assert out.tensor.shape == (3, _LATENT_DIM)
+
+
+class TestNonBatchedGradientFlow:
+    # The reshape-based generalization must not sever the gradient path for
+    # the newly supported ranks. One representative rank (ImageSequence, which
+    # gives N=seq>=2 rows so train-mode BatchNorm is well defined) exercises
+    # the whole ViT -> Linear -> BatchNorm chain; the per-layer coverage for
+    # the (batch, seq) path already lives in TestGradientFlow.
+
+    def test_backward_reaches_vit(self):
+        encoder = _make_encoder()
+
+        encoder(_make_image_sequence(seq=3)).tensor.sum().backward()
+
+        vit_grads = [p.grad for p in encoder.vit.parameters() if p.grad is not None]
+        assert vit_grads, "no ViT parameter received a gradient"
+
+    def test_backward_reaches_projection(self):
+        encoder = _make_encoder()
+
+        encoder(_make_image_sequence(seq=3)).tensor.sum().backward()
+
+        assert encoder.proj.weight.grad is not None
+
+    def test_backward_reaches_batchnorm(self):
+        encoder = _make_encoder()
+
+        encoder(_make_image_sequence(seq=3)).tensor.sum().backward()
+
+        assert encoder.bn.weight.grad is not None
+
+
+class TestSingleImageBatchNormConstraint:
+    # Documented, intentionally-unchanged constraint: a lone Image collapses to
+    # N=1 rows, and BatchNorm1d cannot compute batch variance over a single
+    # sample in train mode. This guards that the reshape generalization does
+    # NOT silently paper over the N=1 case.
+
+    def test_single_image_in_train_mode_raises(self):
+        encoder = _make_encoder()  # train mode is the default
+
+        with pytest.raises(ValueError):
+            encoder(_make_image())
+
+    def test_image_sequence_in_train_mode_is_allowed(self):
+        # Contrast: a length>=2 sequence gives N>=2 rows, so train-mode
+        # BatchNorm variance is well defined and the same path succeeds.
+        encoder = _make_encoder()  # train mode is the default
+
+        out = encoder(_make_image_sequence(seq=2))
+
+        assert out.tensor.shape == (2, _LATENT_DIM)
+
+    def test_single_image_in_eval_mode_is_allowed(self):
+        # Contrast: eval mode uses fixed running stats instead of per-batch
+        # variance, so the same lone Image passes through fine.
+        encoder = _make_encoder().eval()
+
+        with torch.no_grad():
+            out = encoder(_make_image())
+
+        assert out.tensor.shape == (_LATENT_DIM,)
