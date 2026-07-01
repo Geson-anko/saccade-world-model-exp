@@ -24,7 +24,7 @@ import pytest
 import torch
 
 from exp.loss import MSELoss, SIGReg
-from exp.types.latent import BatchedLatentSequence
+from exp.types import BatchedLatentSequence
 
 
 def _latent(tensor: torch.Tensor) -> BatchedLatentSequence:

@@ -1,25 +1,25 @@
 ---
 name: project-types-package
-description: exp/types/ はプロジェクト最基盤の型パッケージ。Image 値オブジェクトと DeviceTransferMixin を提供し、public API が契約テストで固定されている
+description: exp/types/ はプロジェクト最基盤の型パッケージ。tensor 値オブジェクト群 (elements/) と DeviceTransferMixin を提供し、public API が契約テストで固定されている
 metadata:
   type: project
 ---
 
-`exp/types/` はプロジェクト最基盤の型パッケージ。`exp.{DeviceLike, DeviceTransferMixin, Image}` を再 export する。
+`exp/types/` はプロジェクト最基盤の型パッケージ。`exp` / `exp.types` が値オブジェクト群と device 抽象を再 export する。
 
-- `mixin.py`: `DeviceLike = torch.device | str`（PEP 695 type alias）+ `DeviceTransferMixin`(ABC、状態なし、`device` property と `to` を abstract で強制)
-- `image.py`: `Image`（attrs `define(slots=True, frozen=True, eq=False)` の不変値オブジェクト、`(C,H,W)` tensor を内包）。property `channels/height/width/size/channel_format/is_squared/device`、変換系メソッド `to/float/uint8/standardize/normalize/as_channel_format/square_pad/focus/resize`、I/O `load/save`、`ChannelFormat`(IntEnum GRAY=1/RGB=3/RGBA=4) を提供。変換系は in-place 不可で必ず新 Image を返す（`type(self)(...)`）。
-- `size.py`: `Size2d = int | tuple[int,int]`（PEP 695）+ `size_2d_to_tuple`（int→正方 (n,n)、tuple は (h,w) passthrough）
+構成（2026-07 時点）:
+- `device.py`: `DeviceLike = torch.device | str`（PEP 695）+ `DeviceTransferMixin`(ABC、`__slots__=()` で子の slots を全チェーン実効化、`device` property と `to` を abstract 強制) + `SupportsDeviceTransfer`(Protocol、torch.Tensor/Module も構造適合)
+- `size.py`: `Size2d = int | tuple[int,int]`（PEP 695）+ `size_2d_to_tuple`
+- `tensor.py`: `ScalarTensor`（スカラー損失値の値オブジェクト。[[project-loss-module]] が使用）
+- `elements/`: tensor 値オブジェクト群のサブパッケージ。[[project-element-base]]（内部基底 base.py）+ 具象 image.py / focus.py / latent.py。`elements/__init__.py` が 13 シンボルを re-export。詳細は各 memory 参照。
 
 **この層の確立済みパターン（refactor 時に尊重する、自分の好みで崩さない）:**
-- `float` メソッドが組み込み `float` をシャドウするため型注釈には module-level `_float = float` 別名を使う。消すと pyright が壊れる（意図的な回避策）。
-- docstring は docformatter 対策で**日本語始まり・短い1行 description**。英語始まりは先頭 capitalize、長い description は日本語途中で折り返される実害あり。
-- zero-guard は `standardize`/`normalize` で `float(stat) == 0.0` 系。2 メソッドの構造は似るが分岐の戻り値が異なり、統合より独立可読性を優先（「2回まで OK」）。
-- private helper `_as_rgb`/`_alpha_like` は適切な粒度。`channels/height/width` 3 property は同形だが CHW 軸の明示性のため統合しない。
+- すべての具象値オブジェクトは `@final` + `@attrs.define(slots=True, frozen=True, eq=False)` + `Element`/`ElementArray`/`BatchedElementSequence` 継承。`_NDIM`/`_SHAPE_DESC`/(任意で)`_SHAPE` の ClassVar を宣言順この順で定義（3 モジュールで一貫、崩さない）。
+- `_item_type`/`_batch_type` は `@classmethod`+`@override`、`type[...]` 返却。3 モジュールで完全一致。
+- 具象モジュールの `__all__` は多行 + magic trailing comma が package 内の支配的スタイル（base/image/latent/両 __init__）。1 行に収まっても多行に揃える。
+- docstring: docformatter 対策で日本語始まり・短い description。CJK 長文は 132 桁近辺で docformatter が途中改行し stray space が入ることがある（image.py BatchedImageSequence 等に既存の軽微アーティファクト）。手で直しても再 mangle される恐れがあり過剰反応しない。
+- 具象間の docstring 粒度: 収集型クラスは「要素 0（空〜）も許容する」の不変条件注記を全モジュールで揃える（2026-07 に latent へ追記して統一）。leaf の semantic 説明は型ごとに正当に異なる（Image=変換系/Focus=point,zoom/Latent=最小）ので無理に揃えない。
 
 **Why:** 下流の系列モデル・エンコーダ・データローダ実装すべてが依存する基盤型。Hyrum's law 緩和のため public 表面が契約で固定されている。
 
-**How to apply:** この層を refactor する際は以下を不変条件として絶対に変えない（設計判断として確定済み）:
-公開シンボル名、`Image(tensor)` シグネチャ、property 名 `channels/height/width/device`、`to(device)` の `type(self)(...)` 新インスタンス返却、`attrs.define(slots=True, frozen=True, eq=False)`、`ndim==3` 検証、`@property`→`@override` のデコレータ順序、相対 import。`tests/test_api_contract.py`（`@pytest.mark.api_contract`）が export 集合と base class 関係をピンしている。
-
-2026-06-28 の image-transforms 拡張をレビュー: 実装はほぼクリーン。唯一の客観的 DRY 修正として `focus` 内の `squared = self if self.is_squared else self.square_pad()` を `self.square_pad()` に簡素化（square_pad が既に is_squared noop を内包し self を返すので二重チェック）。`focus` の x/y 対称座標計算 (cx/cy/left/top) はちょうど 2 回・1 メソッド内なので closure 抽出は過剰と判断し保留（「外科的変更・過度な抽象化を避ける」）。enum 値テスト等の冗長気味テストは spec-test-author 専任のため削除せず観測のみ報告した。
+**How to apply:** `tests/test_api_contract.py`（`@pytest.mark.api_contract`）が `exp.__all__`(19)/`exp.types.__all__`(19) の集合、base 系(Element/ElementArray/エイリアス/BatchedElementSequence)が exp から import できないこと、全値オブジェクトが DeviceTransferMixin サブクラスであることをピン。refactor では公開シンボル名・シグネチャ・エラー substring・継承・相対 import・デコレータ付け方を変えない。
