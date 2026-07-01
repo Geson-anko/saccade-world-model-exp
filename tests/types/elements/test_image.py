@@ -1,9 +1,18 @@
-"""Behaviour spec for ``exp.types.image``.
+"""Behaviour spec for ``exp.types.elements.image``.
 
 These tests translate the approved spec for the immutable ``Image``
-value object into executable form. They are written against the *spec*,
-not any implementation: an implementation that diverges should make
-these red. Scenarios are grouped into one class per behaviour area.
+value object and its collection types (``ImageSequence`` /
+``BatchedImage`` / ``BatchedImageSequence``) into executable form. They
+are written against the *spec*, not any implementation: an
+implementation that diverges should make these red. Scenarios are
+grouped into one class per behaviour area.
+
+The collection contract (``from_elements`` stack factory, indexing /
+slicing / iteration, ``iter_batch`` / ``iter_sequence`` two-axis
+traversal, ``from_sequences`` / ``from_batches``, shape validation,
+empty inputs) is inherited from the shared element base, but is
+exercised here through the public ``Image`` family only — no base
+internals are imported.
 
 Tensors are constructed deterministically on real CPU torch (no mocking
 of torch) per the project testing strategy.
@@ -12,7 +21,13 @@ of torch) per the project testing strategy.
 import pytest
 import torch
 
-from exp.types.image import BatchedImageSequence, ChannelFormat, Image, ImageSequence
+from exp.types.elements.image import (
+    BatchedImage,
+    BatchedImageSequence,
+    ChannelFormat,
+    Image,
+    ImageSequence,
+)
 
 
 class TestConstruction:
@@ -26,13 +41,14 @@ class TestConstruction:
         with pytest.raises(ValueError, match="C, H, W"):
             Image(torch.zeros(1, 3, 8, 16))
 
-    def test_error_reports_actual_shape(self):
-        # The message must surface the offending shape (substring check only).
+    def test_error_reports_actual_ndim_and_shape(self):
+        # The message must surface the offending ndim and shape (substring only).
         with pytest.raises(ValueError) as exc:
             Image(torch.zeros(8, 16))
 
         assert "C, H, W" in str(exc.value)
-        assert "8" in str(exc.value) and "16" in str(exc.value)
+        assert "2" in str(exc.value)  # ndim
+        assert "8" in str(exc.value) and "16" in str(exc.value)  # shape
 
 
 class TestShapeProperties:
@@ -267,6 +283,33 @@ class TestLoadSave:
             Image(torch.zeros(4, 8, 8, dtype=torch.uint8)).save(tmp_path / "a.jpg")
 
 
+# ---------------------------------------------------------------------------
+# Value-distinct builders: pixels are unique per index so order-preservation
+# and element identity are observable via per-frame torch.equal checks.
+# ---------------------------------------------------------------------------
+def _distinct_image(index: int) -> Image:
+    # A unique (3, 8, 16) tensor per index: contiguous arange offset by a
+    # per-index stride, leaving no two frames equal.
+    stride = 3 * 8 * 16
+    return Image(torch.arange(index * stride, (index + 1) * stride).reshape(3, 8, 16))
+
+
+def _distinct_sequence(index: int) -> ImageSequence:
+    # Same idea at the sequence level: a unique (5, 3, 8, 16) block per index.
+    stride = 5 * 3 * 8 * 16
+    return ImageSequence(
+        torch.arange(index * stride, (index + 1) * stride).reshape(5, 3, 8, 16)
+    )
+
+
+def _distinct_batched_image(index: int) -> BatchedImage:
+    # A unique (2, 3, 8, 16) batch per index (2 images per batch entry).
+    stride = 2 * 3 * 8 * 16
+    return BatchedImage(
+        torch.arange(index * stride, (index + 1) * stride).reshape(2, 3, 8, 16)
+    )
+
+
 class TestImageSequenceConstruction:
     def test_rejects_3d_tensor(self):
         # A 3D tensor lacks the leading length axis required by (len, C, H, W).
@@ -379,6 +422,205 @@ class TestImageSequenceDeviceTransfer:
         assert torch.equal(result.tensor, seq.tensor)
 
 
+class TestImageSequenceFromElements:
+    def test_stacks_multiple_images(self):
+        # Three value-distinct Images stack into a (len, C, H, W) sequence; the
+        # per-frame torch.equal checks pin both element identity and order.
+        images = [_distinct_image(0), _distinct_image(1), _distinct_image(2)]
+
+        result = ImageSequence.from_elements(images)
+
+        assert type(result) is ImageSequence
+        assert len(result) == 3
+        assert result.tensor.shape == (3, 3, 8, 16)
+        assert torch.equal(result.tensor[0], images[0].tensor)
+        assert torch.equal(result.tensor[1], images[1].tensor)
+        assert torch.equal(result.tensor[2], images[2].tensor)
+
+    def test_single_image(self):
+        # The minimum non-empty input is one Image, yielding leading axis 1.
+        image = _distinct_image(7)
+
+        result = ImageSequence.from_elements([image])
+
+        assert type(result) is ImageSequence
+        assert len(result) == 1
+        assert result.tensor.shape == (1, 3, 8, 16)
+        assert torch.equal(result.tensor[0], image.tensor)
+
+    def test_empty_raises_value_error(self):
+        # Empty input violates the "at least one element" contract (substring).
+        with pytest.raises(ValueError, match="at least one element"):
+            ImageSequence.from_elements([])
+
+    def test_accepts_generator(self):
+        # A one-shot generator (N>=1) must work: the empty check and the stack
+        # both succeed, proving the input is materialized before being scanned.
+        result = ImageSequence.from_elements(_distinct_image(i) for i in range(2))
+
+        assert type(result) is ImageSequence
+        assert len(result) == 2
+        assert result.tensor.shape == (2, 3, 8, 16)
+
+    def test_preserves_dtype(self):
+        # torch.stack carries the element dtype through; uint8 must survive.
+        images = [Image(torch.zeros(3, 8, 16, dtype=torch.uint8)) for _ in range(2)]
+
+        result = ImageSequence.from_elements(images)
+
+        assert result.tensor.dtype == torch.uint8
+
+
+class TestBatchedImageConstruction:
+    def test_rejects_3d_tensor(self):
+        # A 3D tensor lacks the leading batch axis required by (batch, C, H, W).
+        with pytest.raises(ValueError, match=r"batch, C, H, W"):
+            BatchedImage(torch.zeros(3, 8, 16))
+
+    def test_rejects_5d_tensor(self):
+        # A 5D tensor carries an extra axis the batch forbids.
+        with pytest.raises(ValueError, match=r"batch, C, H, W"):
+            BatchedImage(torch.zeros(2, 5, 3, 8, 16))
+
+    def test_error_reports_actual_ndim_and_shape(self):
+        # The message must surface the offending ndim and shape (substring only).
+        with pytest.raises(ValueError) as exc:
+            BatchedImage(torch.zeros(3, 8, 16))
+
+        assert "batch, C, H, W" in str(exc.value)
+        assert "3" in str(exc.value)  # ndim
+        assert "8" in str(exc.value) and "16" in str(exc.value)  # shape
+
+    def test_accepts_4d_tensor(self):
+        batch = BatchedImage(torch.zeros(4, 3, 8, 16))
+        assert len(batch) == 4
+
+    def test_accepts_empty_batch(self):
+        # An empty (0, C, H, W) batch is a valid value, not an error.
+        batch = BatchedImage(torch.zeros(0, 3, 8, 16))
+        assert len(batch) == 0
+
+
+class TestBatchedImageIndexing:
+    def test_int_index_returns_image(self):
+        batch = BatchedImage(torch.arange(4 * 3 * 8 * 16).reshape(4, 3, 8, 16))
+
+        entry = batch[2]
+
+        assert type(entry) is Image
+        assert torch.equal(entry.tensor, batch.tensor[2])
+
+    def test_negative_index_returns_last_image(self):
+        batch = BatchedImage(torch.arange(4 * 3 * 8 * 16).reshape(4, 3, 8, 16))
+
+        entry = batch[-1]
+
+        assert type(entry) is Image
+        assert torch.equal(entry.tensor, batch.tensor[3])
+
+    def test_slice_returns_batched_image(self):
+        batch = BatchedImage(torch.arange(4 * 3 * 8 * 16).reshape(4, 3, 8, 16))
+
+        sub = batch[1:3]
+
+        assert type(sub) is BatchedImage
+        assert len(sub) == 2
+        assert torch.equal(sub.tensor[0], batch.tensor[1])
+        assert torch.equal(sub.tensor[1], batch.tensor[2])
+
+    def test_out_of_range_int_raises_index_error(self):
+        batch = BatchedImage(torch.zeros(4, 3, 8, 16))
+        with pytest.raises(IndexError):
+            _ = batch[4]
+
+
+class TestBatchedImageLen:
+    def test_len_is_leading_axis(self):
+        assert len(BatchedImage(torch.zeros(4, 3, 8, 16))) == 4
+
+    def test_len_of_empty_is_zero(self):
+        assert len(BatchedImage(torch.zeros(0, 3, 8, 16))) == 0
+
+
+class TestBatchedImageIter:
+    def test_iterates_entries_as_images(self):
+        batch = BatchedImage(torch.arange(4 * 3 * 8 * 16).reshape(4, 3, 8, 16))
+
+        entries = list(batch)
+
+        assert len(entries) == 4
+        assert all(type(e) is Image for e in entries)
+        for i, entry in enumerate(entries):
+            assert torch.equal(entry.tensor, batch.tensor[i])
+
+    def test_iterates_empty_as_no_entries(self):
+        assert list(BatchedImage(torch.zeros(0, 3, 8, 16))) == []
+
+
+class TestBatchedImageDeviceTransfer:
+    def test_device_reflects_tensor(self):
+        assert BatchedImage(torch.zeros(4, 3, 8, 16)).device == torch.device("cpu")
+
+    def test_device_available_for_empty_batch(self):
+        assert BatchedImage(torch.zeros(0, 3, 8, 16)).device == torch.device("cpu")
+
+    def test_to_returns_new_batch(self):
+        # `to` is not in-place: it returns a fresh BatchedImage with equal values.
+        batch = BatchedImage(torch.zeros(4, 3, 8, 16))
+
+        result = batch.to("cpu")
+
+        assert type(result) is BatchedImage
+        assert result is not batch
+        assert torch.equal(result.tensor, batch.tensor)
+
+    def test_to_accepts_torch_device(self):
+        batch = BatchedImage(torch.zeros(4, 3, 8, 16))
+
+        result = batch.to(torch.device("cpu"))
+
+        assert type(result) is BatchedImage
+        assert torch.equal(result.tensor, batch.tensor)
+
+
+class TestBatchedImageFromElements:
+    def test_stacks_multiple_images(self):
+        # Three value-distinct Images stack into a (batch, C, H, W) batch; the
+        # per-entry torch.equal checks pin both element identity and order.
+        images = [_distinct_image(0), _distinct_image(1), _distinct_image(2)]
+
+        result = BatchedImage.from_elements(images)
+
+        assert type(result) is BatchedImage
+        assert len(result) == 3
+        assert result.tensor.shape == (3, 3, 8, 16)
+        assert torch.equal(result.tensor[0], images[0].tensor)
+        assert torch.equal(result.tensor[1], images[1].tensor)
+        assert torch.equal(result.tensor[2], images[2].tensor)
+
+    def test_single_image(self):
+        image = _distinct_image(5)
+
+        result = BatchedImage.from_elements([image])
+
+        assert type(result) is BatchedImage
+        assert len(result) == 1
+        assert result.tensor.shape == (1, 3, 8, 16)
+        assert torch.equal(result.tensor[0], image.tensor)
+
+    def test_empty_raises_value_error(self):
+        # Empty input violates the "at least one element" contract (substring).
+        with pytest.raises(ValueError, match="at least one element"):
+            BatchedImage.from_elements([])
+
+    def test_accepts_generator(self):
+        result = BatchedImage.from_elements(_distinct_image(i) for i in range(2))
+
+        assert type(result) is BatchedImage
+        assert len(result) == 2
+        assert result.tensor.shape == (2, 3, 8, 16)
+
+
 class TestBatchedImageSequenceConstruction:
     def test_rejects_4d_tensor(self):
         # A 4D tensor lacks the leading batch axis required by (batch, len, C, H, W).
@@ -449,15 +691,18 @@ class TestBatchedImageSequenceIndexing:
 
 
 class TestBatchedImageSequenceLen:
-    def test_len_is_leading_axis(self):
+    def test_len_is_leading_batch_axis(self):
         assert len(BatchedImageSequence(torch.zeros(2, 5, 3, 8, 16))) == 2
 
     def test_len_of_empty_is_zero(self):
         assert len(BatchedImageSequence(torch.zeros(0, 5, 3, 8, 16))) == 0
 
 
-class TestBatchedImageSequenceIter:
-    def test_iterates_entries_as_image_sequences(self):
+class TestBatchedImageSequenceIterBatch:
+    # __iter__ / iter_batch both traverse the batch axis (dim=0), yielding
+    # one ImageSequence per batch entry.
+
+    def test_iter_yields_image_sequences_over_batch_axis(self):
         batch = BatchedImageSequence(
             torch.arange(2 * 5 * 3 * 8 * 16).reshape(2, 5, 3, 8, 16)
         )
@@ -469,8 +714,48 @@ class TestBatchedImageSequenceIter:
         for i, entry in enumerate(entries):
             assert torch.equal(entry.tensor, batch.tensor[i])
 
-    def test_iterates_empty_as_no_entries(self):
-        assert list(BatchedImageSequence(torch.zeros(0, 5, 3, 8, 16))) == []
+    def test_iter_batch_matches_plain_iteration(self):
+        # iter_batch is documented as equivalent to __iter__.
+        batch = BatchedImageSequence(
+            torch.arange(2 * 5 * 3 * 8 * 16).reshape(2, 5, 3, 8, 16)
+        )
+
+        from_iter_batch = list(batch.iter_batch())
+        from_iter = list(batch)
+
+        assert len(from_iter_batch) == len(from_iter) == 2
+        assert all(type(e) is ImageSequence for e in from_iter_batch)
+        for a, b in zip(from_iter_batch, from_iter, strict=True):
+            assert torch.equal(a.tensor, b.tensor)
+
+    def test_iter_batch_of_empty_is_no_entries(self):
+        assert (
+            list(BatchedImageSequence(torch.zeros(0, 5, 3, 8, 16)).iter_batch()) == []
+        )
+
+
+class TestBatchedImageSequenceIterSequence:
+    # iter_sequence traverses the seq axis (dim=1), yielding one BatchedImage
+    # per time step; each entry keeps the full batch axis.
+
+    def test_yields_batched_images_over_seq_axis(self):
+        batch = BatchedImageSequence(
+            torch.arange(2 * 5 * 3 * 8 * 16).reshape(2, 5, 3, 8, 16)
+        )
+
+        steps = list(batch.iter_sequence())
+
+        assert len(steps) == 5  # one per time step
+        assert all(type(s) is BatchedImage for s in steps)
+        for t, step in enumerate(steps):
+            # step t collapses the seq axis at index t, keeping (batch, C, H, W).
+            assert step.tensor.shape == (2, 3, 8, 16)
+            assert torch.equal(step.tensor, batch.tensor[:, t])
+
+    def test_iter_sequence_of_empty_seq_is_no_steps(self):
+        # (batch, seq=0, C, H, W): no time steps to yield.
+        empty_seq = BatchedImageSequence(torch.zeros(2, 0, 3, 8, 16))
+        assert list(empty_seq.iter_sequence()) == []
 
 
 class TestBatchedImageSequenceDeviceTransfer:
@@ -503,72 +788,9 @@ class TestBatchedImageSequenceDeviceTransfer:
         assert torch.equal(result.tensor, batch.tensor)
 
 
-def _distinct_image(index: int) -> Image:
-    # Build an Image whose pixels are unique to `index` so order-preservation
-    # is observable: each (3, 8, 16) tensor is a contiguous arange offset by a
-    # per-index stride, leaving no two frames equal.
-    stride = 3 * 8 * 16
-    return Image(torch.arange(index * stride, (index + 1) * stride).reshape(3, 8, 16))
-
-
-def _distinct_sequence(index: int) -> ImageSequence:
-    # Same idea at the sequence level: a unique (5, 3, 8, 16) block per index.
-    stride = 5 * 3 * 8 * 16
-    return ImageSequence(
-        torch.arange(index * stride, (index + 1) * stride).reshape(5, 3, 8, 16)
-    )
-
-
-class TestImageSequenceFromImages:
-    def test_stacks_multiple_images(self):
-        # Three value-distinct Images stack into a (len, C, H, W) sequence; the
-        # per-frame torch.equal checks pin both element identity and order.
-        images = [_distinct_image(0), _distinct_image(1), _distinct_image(2)]
-
-        result = ImageSequence.from_images(images)
-
-        assert type(result) is ImageSequence
-        assert len(result) == 3
-        assert result.tensor.shape == (3, 3, 8, 16)
-        assert torch.equal(result.tensor[0], images[0].tensor)
-        assert torch.equal(result.tensor[1], images[1].tensor)
-        assert torch.equal(result.tensor[2], images[2].tensor)
-
-    def test_single_image(self):
-        # The minimum non-empty input is one Image, yielding leading axis 1.
-        image = _distinct_image(7)
-
-        result = ImageSequence.from_images([image])
-
-        assert type(result) is ImageSequence
-        assert len(result) == 1
-        assert result.tensor.shape == (1, 3, 8, 16)
-        assert torch.equal(result.tensor[0], image.tensor)
-
-    def test_empty_raises_value_error(self):
-        # Empty input violates the "at least one" contract (substring match only).
-        with pytest.raises(ValueError, match="at least one"):
-            ImageSequence.from_images([])
-
-    def test_accepts_generator(self):
-        # A one-shot generator (N>=1) must work: the empty check and the stack
-        # both succeed, proving the input is materialized before being scanned.
-        result = ImageSequence.from_images(_distinct_image(i) for i in range(2))
-
-        assert type(result) is ImageSequence
-        assert len(result) == 2
-        assert result.tensor.shape == (2, 3, 8, 16)
-
-    def test_preserves_dtype(self):
-        # torch.stack carries the element dtype through; uint8 must survive.
-        images = [Image(torch.zeros(3, 8, 16, dtype=torch.uint8)) for _ in range(2)]
-
-        result = ImageSequence.from_images(images)
-
-        assert result.tensor.dtype == torch.uint8
-
-
 class TestBatchedImageSequenceFromSequences:
+    # from_sequences stacks ImageSequences along a NEW batch axis (dim=0).
+
     def test_stacks_multiple_sequences(self):
         # Two value-distinct sequences stack into (batch, len, C, H, W); the
         # per-entry torch.equal checks pin both element identity and order.
@@ -577,7 +799,6 @@ class TestBatchedImageSequenceFromSequences:
         result = BatchedImageSequence.from_sequences(sequences)
 
         assert type(result) is BatchedImageSequence
-        assert len(result) == 2
         assert result.tensor.shape == (2, 5, 3, 8, 16)
         assert torch.equal(result.tensor[0], sequences[0].tensor)
         assert torch.equal(result.tensor[1], sequences[1].tensor)
@@ -589,13 +810,12 @@ class TestBatchedImageSequenceFromSequences:
         result = BatchedImageSequence.from_sequences([sequence])
 
         assert type(result) is BatchedImageSequence
-        assert len(result) == 1
         assert result.tensor.shape == (1, 5, 3, 8, 16)
         assert torch.equal(result.tensor[0], sequence.tensor)
 
     def test_empty_raises_value_error(self):
-        # Empty input violates the "at least one" contract (substring match only).
-        with pytest.raises(ValueError, match="at least one"):
+        # Empty input violates the "at least one sequence" contract (substring).
+        with pytest.raises(ValueError, match="at least one sequence"):
             BatchedImageSequence.from_sequences([])
 
     def test_accepts_generator(self):
@@ -606,5 +826,78 @@ class TestBatchedImageSequenceFromSequences:
         )
 
         assert type(result) is BatchedImageSequence
-        assert len(result) == 2
         assert result.tensor.shape == (2, 5, 3, 8, 16)
+
+
+class TestBatchedImageSequenceFromElements:
+    # from_elements (inherited) also stacks ImageSequences along dim=0, so its
+    # result equals from_sequences on the same input.
+
+    def test_stacks_sequences_along_batch_axis(self):
+        sequences = [_distinct_sequence(0), _distinct_sequence(1)]
+
+        result = BatchedImageSequence.from_elements(sequences)
+
+        assert type(result) is BatchedImageSequence
+        assert result.tensor.shape == (2, 5, 3, 8, 16)
+        assert torch.equal(result.tensor[0], sequences[0].tensor)
+        assert torch.equal(result.tensor[1], sequences[1].tensor)
+
+    def test_empty_raises_value_error(self):
+        with pytest.raises(ValueError, match="at least one element"):
+            BatchedImageSequence.from_elements([])
+
+
+class TestBatchedImageSequenceFromBatches:
+    # from_batches stacks per-time-step BatchedImages along the seq axis (dim=1),
+    # producing (batch, seq, C, H, W). It is the inverse of iter_sequence.
+
+    def test_stacks_batched_images_along_seq_axis(self):
+        # Three value-distinct BatchedImages (each 2 images) become 3 time steps.
+        steps = [
+            _distinct_batched_image(0),
+            _distinct_batched_image(1),
+            _distinct_batched_image(2),
+        ]
+
+        result = BatchedImageSequence.from_batches(steps)
+
+        assert type(result) is BatchedImageSequence
+        # dim=1 stack: (batch=2, seq=3, C, H, W).
+        assert result.tensor.shape == (2, 3, 3, 8, 16)
+        for t, step in enumerate(steps):
+            assert torch.equal(result.tensor[:, t], step.tensor)
+
+    def test_single_batch(self):
+        # One BatchedImage yields seq length 1.
+        step = _distinct_batched_image(4)
+
+        result = BatchedImageSequence.from_batches([step])
+
+        assert type(result) is BatchedImageSequence
+        assert result.tensor.shape == (2, 1, 3, 8, 16)
+        assert torch.equal(result.tensor[:, 0], step.tensor)
+
+    def test_round_trips_with_iter_sequence(self):
+        # from_batches(iter_sequence(x)) reconstructs x: the two are inverses.
+        original = BatchedImageSequence(
+            torch.arange(2 * 5 * 3 * 8 * 16).reshape(2, 5, 3, 8, 16)
+        )
+
+        rebuilt = BatchedImageSequence.from_batches(original.iter_sequence())
+
+        assert type(rebuilt) is BatchedImageSequence
+        assert torch.equal(rebuilt.tensor, original.tensor)
+
+    def test_empty_raises_value_error(self):
+        # Empty input violates the "at least one batch" contract (substring).
+        with pytest.raises(ValueError, match="at least one batch"):
+            BatchedImageSequence.from_batches([])
+
+    def test_accepts_generator(self):
+        result = BatchedImageSequence.from_batches(
+            _distinct_batched_image(i) for i in range(3)
+        )
+
+        assert type(result) is BatchedImageSequence
+        assert result.tensor.shape == (2, 3, 3, 8, 16)

@@ -17,16 +17,21 @@ def test_exp_exports():
     # Contract pin (not a behaviour test): the public export surface of `exp`
     # is exactly these symbols, and each is actually present.
     expected = {
+        "BatchedFocus",
         "BatchedFocusSequence",
+        "BatchedImage",
         "BatchedImageSequence",
+        "BatchedLatent",
         "BatchedLatentSequence",
         "ChannelFormat",
-        "Focus",
-        "FocusSequence",
         "DeviceLike",
         "DeviceTransferMixin",
+        "Focus",
+        "FocusSequence",
         "Image",
         "ImageSequence",
+        "Latent",
+        "LatentSequence",
         "ScalarTensor",
         "Size2d",
         "SupportsDeviceTransfer",
@@ -36,6 +41,17 @@ def test_exp_exports():
     assert set(exp.__all__) == expected
     for name in expected:
         assert hasattr(exp, name)
+
+    # Contract pin: internal base 系 (Element / ElementArray / エイリアス /
+    # BatchedElementSequence) は公開しない。exp からは import できないこと。
+    for base_name in (
+        "Element",
+        "ElementArray",
+        "ElementSequence",
+        "BatchedElement",
+        "BatchedElementSequence",
+    ):
+        assert not hasattr(exp, base_name)
 
 
 @pytest.mark.api_contract
@@ -47,9 +63,19 @@ def test_image_is_device_transfer_mixin():
 
 @pytest.mark.api_contract
 def test_sequence_types_are_device_transfer_mixins():
-    # Contract pin (not a behaviour test): the sequence value objects share
+    # Contract pin (not a behaviour test): all element value objects share
     # Image's DeviceTransferMixin base, which external code may rely on.
-    assert issubclass(exp.ImageSequence, exp.DeviceTransferMixin)
-    assert issubclass(exp.BatchedImageSequence, exp.DeviceTransferMixin)
-    assert issubclass(exp.FocusSequence, exp.DeviceTransferMixin)
-    assert issubclass(exp.BatchedFocusSequence, exp.DeviceTransferMixin)
+    for cls in (
+        exp.Focus,
+        exp.Latent,
+        exp.ImageSequence,
+        exp.FocusSequence,
+        exp.LatentSequence,
+        exp.BatchedImage,
+        exp.BatchedFocus,
+        exp.BatchedLatent,
+        exp.BatchedImageSequence,
+        exp.BatchedFocusSequence,
+        exp.BatchedLatentSequence,
+    ):
+        assert issubclass(cls, exp.DeviceTransferMixin)

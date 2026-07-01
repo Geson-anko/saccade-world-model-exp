@@ -1,6 +1,9 @@
 from .types import (
+    BatchedFocus,
     BatchedFocusSequence,
+    BatchedImage,
     BatchedImageSequence,
+    BatchedLatent,
     BatchedLatentSequence,
     ChannelFormat,
     DeviceLike,
@@ -9,6 +12,8 @@ from .types import (
     FocusSequence,
     Image,
     ImageSequence,
+    Latent,
+    LatentSequence,
     ScalarTensor,
     Size2d,
     SupportsDeviceTransfer,
@@ -16,8 +21,11 @@ from .types import (
 )
 
 __all__ = [
+    "BatchedFocus",
     "BatchedFocusSequence",
+    "BatchedImage",
     "BatchedImageSequence",
+    "BatchedLatent",
     "BatchedLatentSequence",
     "ChannelFormat",
     "DeviceLike",
@@ -26,6 +34,8 @@ __all__ = [
     "FocusSequence",
     "Image",
     "ImageSequence",
+    "Latent",
+    "LatentSequence",
     "ScalarTensor",
     "Size2d",
     "SupportsDeviceTransfer",

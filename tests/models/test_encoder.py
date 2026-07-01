@@ -23,8 +23,7 @@ import pytest
 import torch
 
 from exp.models.encoder import ImageEncoder
-from exp.types.image import BatchedImageSequence
-from exp.types.latent import BatchedLatentSequence
+from exp.types import BatchedImageSequence, BatchedLatentSequence
 from tests.helpers import parametrize_device
 
 # Small but spec-valid config. image 32x32 with the fixed patch size 16

@@ -10,9 +10,7 @@ from typing import override
 
 import torch.nn as nn
 
-from exp.types.image import BatchedImageSequence
-from exp.types.latent import BatchedLatentSequence
-from exp.types.size import Size2d
+from exp.types import BatchedImageSequence, BatchedLatentSequence, Size2d
 
 from .components import VisionTransformer, init_weights
 
