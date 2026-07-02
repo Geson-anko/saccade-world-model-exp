@@ -12,4 +12,5 @@
 - [tests/types/ shadows stdlib](feedback_types_package_shadows_stdlib.md) — an __init__.py under tests/types/ names the pkg `types`, breaking collection suite-wide
 - [ImageEncoder overload spec](project_encoder_overload_spec.md) — rank-preserving __call__ (Image/Batched/Sequence/BatchedSequence); BatchNorm N=1 train constraint = ValueError
 - [ImageDecoder spec](project_decoder_spec.md) — encoder-mirror Latent→Image decoder; linear out (no range test), no detach (contract pin), GroupNorm so N=1 train OK
+- [Data pipeline spec](project_data_pipeline_spec.md) — exp.data glimpse pipeline (random_focus_sequence/GlimpseDataset/collate_glimpses) real-file-IO test patterns
 - [ruff isort missing module](feedback_ruff_isort_missing_module.md) — red-first tests importing a not-yet-created exp.* module get odd isort grouping that self-corrects once the module lands
