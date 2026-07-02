@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from pathlib import Path
 
 import torch
@@ -8,8 +7,6 @@ from torch.utils.data import Dataset
 
 from exp.types import (
     FOCUS_DIM,
-    BatchedFocusSequence,
-    BatchedImageSequence,
     ChannelFormat,
     FocusSequence,
     Image,
@@ -17,7 +14,7 @@ from exp.types import (
     Size2d,
 )
 
-__all__ = ["GlimpseDataset", "collate_glimpses", "random_focus_sequence"]
+__all__ = ["GlimpseDataset", "random_focus_sequence"]
 
 _IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg"})
 
@@ -74,16 +71,3 @@ class GlimpseDataset(Dataset[tuple[FocusSequence, ImageSequence]]):
         )
         focuses = random_focus_sequence(self._seq_len, self._generator)
         return focuses, focuses.apply(image, self._image_size)
-
-
-def collate_glimpses(
-    batch: Sequence[tuple[FocusSequence, ImageSequence]],
-) -> tuple[BatchedFocusSequence, BatchedImageSequence]:
-    """GlimpseDataset のサンプル列をバッチへまとめる collate 関数。
-
-    DataLoader の collate_fn= に渡せる。空リストは from_sequences が ValueError
-    を出すため追加検証はしない。
-    """
-    focuses = BatchedFocusSequence.from_sequences(f for f, _ in batch)
-    observations = BatchedImageSequence.from_sequences(o for _, o in batch)
-    return focuses, observations
