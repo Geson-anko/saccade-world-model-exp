@@ -24,11 +24,15 @@ import pytest
 import torch
 
 from exp.loss import MSELoss, SIGReg
-from exp.types import BatchedLatentSequence
+from exp.types import BatchedImageSequence, BatchedLatentSequence
 
 
 def _latent(tensor: torch.Tensor) -> BatchedLatentSequence:
     return BatchedLatentSequence(tensor)
+
+
+def _image(tensor: torch.Tensor) -> BatchedImageSequence:
+    return BatchedImageSequence(tensor)
 
 
 class TestMSELossValue:
@@ -176,6 +180,78 @@ class TestMSELossReuse:
 
         torch.testing.assert_close(first.tensor, torch.tensor(1.0))
         torch.testing.assert_close(second.tensor, torch.tensor(4.0))
+
+
+class TestMSELossImage:
+    # MSELoss は BatchedImageSequence (B, S, C, H, W) も受け付ける。ここでは
+    # image 経路特有の振る舞い (特徴軸が C,H,W の 3 軸) だけを押さえる。
+
+    def test_mean_of_unit_difference_is_one(self):
+        # pred=0, target=1 -> every squared diff == 1 -> mean == 1.0.
+        mse = MSELoss(reduction="mean")
+        pred = _image(torch.zeros(2, 3, 3, 4, 4))
+        target = _image(torch.ones(2, 3, 3, 4, 4))
+
+        value, _ = mse(pred, target)
+
+        torch.testing.assert_close(value.tensor, torch.tensor(1.0))
+
+    def test_elementwise_means_over_channel_height_width(self):
+        # The core image contract: info["elementwise"] collapses C,H,W (the
+        # axes after (batch, seq)) into a per-position (B, S) mean. Build a
+        # target whose per-position squared error differs, then compare
+        # against the hand-computed C,H,W mean.
+        torch.manual_seed(0)
+        mse = MSELoss()
+        pred_t = torch.zeros(2, 3, 3, 4, 4)
+        target_t = torch.randn(2, 3, 3, 4, 4)
+
+        _, info = mse(_image(pred_t), _image(target_t))
+
+        expected = ((target_t - pred_t) ** 2).mean(dim=(2, 3, 4))
+        assert info["elementwise"].shape == (2, 3)
+        torch.testing.assert_close(info["elementwise"], expected)
+
+    def test_sum_reduction_totals_over_all_elements(self):
+        # reduction="sum": every one of B*S*C*H*W elements contributes 1.
+        mse = MSELoss(reduction="sum")
+        pred = _image(torch.zeros(2, 3, 3, 4, 4))
+        target = _image(torch.ones(2, 3, 3, 4, 4))
+
+        value, _ = mse(pred, target)
+
+        torch.testing.assert_close(value.tensor, torch.tensor(float(2 * 3 * 3 * 4 * 4)))
+
+    def test_identical_inputs_give_zero(self):
+        # pred == target -> squared difference is 0 everywhere.
+        torch.manual_seed(0)
+        mse = MSELoss()
+        same = torch.randn(2, 3, 3, 4, 4)
+
+        value, _ = mse(_image(same), _image(same.clone()))
+
+        torch.testing.assert_close(value.tensor, torch.tensor(0.0))
+
+    def test_rejects_mismatched_shape(self):
+        # Differing spatial extent -> ValueError on call.
+        mse = MSELoss()
+        pred = _image(torch.zeros(2, 3, 3, 4, 4))
+        target = _image(torch.zeros(2, 3, 3, 4, 8))
+
+        with pytest.raises(ValueError, match="same shape"):
+            mse(pred, target)
+
+    def test_gradient_flows_to_both_inputs(self):
+        # No stop-grad: backward through the value reaches both image tensors.
+        mse = MSELoss()
+        pred_tensor = torch.zeros(2, 3, 3, 4, 4, requires_grad=True)
+        target_tensor = torch.ones(2, 3, 3, 4, 4, requires_grad=True)
+
+        value, _ = mse(_image(pred_tensor), _image(target_tensor))
+        value.tensor.backward()
+
+        assert pred_tensor.grad is not None
+        assert target_tensor.grad is not None
 
 
 # --- SIGReg ---------------------------------------------------------------
