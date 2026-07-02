@@ -43,7 +43,7 @@ class MSELoss:
                 f'MSELoss reduction must be "mean" or "sum", got {self.reduction!r}'
             )
 
-    def __call__[T: (BatchedLatentSequence, BatchedImageSequence)](
+    def __call__[T: BatchedLatentSequence | BatchedImageSequence](
         self,
         prediction: T,
         target: T,
@@ -59,7 +59,7 @@ class MSELoss:
         ) ** 2  # latent (B,S,D) / image (B,S,C,H,W)
         value = diff2.mean() if self.reduction == "mean" else diff2.sum()
         # 先頭 2 軸 (batch, seq) を除く全特徴軸で mean → (B, S)
-        elementwise = diff2.mean(dim=tuple(range(2, diff2.ndim))).detach()
+        elementwise = diff2.flatten(2).mean(-1).detach()
         info: MSELossInfo = {
             "output": float(value),
             "elementwise": elementwise,
