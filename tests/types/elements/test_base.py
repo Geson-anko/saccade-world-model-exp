@@ -14,10 +14,10 @@ The fakes are the "self-owned ABC fakes" the strategy permits; torch
 itself is never mocked. Tensors are built deterministically on real CPU
 torch.
 
-Only public behaviour is asserted. The private hooks ``_item_type`` /
-``_batch_type`` are never called directly: their contract is observed
-through ``__getitem__`` / ``__iter__`` / ``iter_sequence`` / the
-``from_*`` factories.
+Only public behaviour is asserted. The type hooks ``_item_type`` and
+``_batch_type`` (both private) are never called directly: their contract
+is observed through ``__getitem__`` / ``__iter__`` / ``iter_sequence`` /
+the ``from_*`` factories.
 """
 
 from typing import ClassVar, override
@@ -81,7 +81,7 @@ class _BatchLeaf(BatchedElement[_Leaf]):
 
 
 @attrs.define(slots=True, frozen=True, eq=False)
-class _BatchSeq(BatchedElementSequence[_BatchLeaf, _Arr]):
+class _BatchSeq(BatchedElementSequence[_BatchLeaf, _Arr, _Leaf]):
     # A rank-3 (batch, seq, n) collection: batch axis yields _Arr sequences,
     # seq axis yields _BatchLeaf batches.
     _NDIM: ClassVar[int] = 3
@@ -343,6 +343,122 @@ class TestBatchedElementSequenceIteration:
         batched = _BatchSeq(torch.zeros(4, 3, 2))
 
         assert len(batched) == 4
+
+
+# --- BatchedElementSequence: 2-tuple (batch, seq) indexing -------------------
+# A single value-distinct (batch, seq, n) tensor drives every case below, so
+# torch.equal pins BOTH the selected element's identity AND its ordering along
+# both the batch and seq axes (an all-zero block could not distinguish e.g.
+# t[:, j] from t[j, :]). The 2-tuple contract: each axis is reduced by an int
+# and kept by a slice, so the restored type is chosen per (batch-axis kind,
+# seq-axis kind): (int,int)->leaf, (int,slice)->sequence, (slice,int)->batch,
+# (slice,slice)->batched-sequence.
+
+
+class TestBatchedElementSequenceGetitem2D:
+    def test_int_int_returns_leaf_at_batch_and_seq_position(self):
+        # [i, j] reduces both axes to the single leaf at (batch i, seq j).
+        t = torch.arange(3 * 4 * 4, dtype=torch.float32).reshape(3, 4, 4)
+        bes = _BatchSeq(t)
+
+        x = bes[1, 2]
+
+        assert type(x) is _Leaf
+        assert torch.equal(x.tensor, t[1, 2])
+
+    def test_int_full_slice_returns_sequence_for_fixed_batch(self):
+        # [i, :] fixes the batch and keeps the whole seq axis -> the _Arr sequence.
+        t = torch.arange(3 * 4 * 4, dtype=torch.float32).reshape(3, 4, 4)
+        bes = _BatchSeq(t)
+
+        x = bes[1, :]
+
+        assert type(x) is _Arr
+        assert torch.equal(x.tensor, t[1, :])
+
+    def test_int_partial_slice_returns_sequence_subrange(self):
+        # [0, 1:3] fixes the batch and sub-slices the seq axis -> _Arr of shape (2, n).
+        t = torch.arange(3 * 4 * 4, dtype=torch.float32).reshape(3, 4, 4)
+        bes = _BatchSeq(t)
+
+        x = bes[0, 1:3]
+
+        assert type(x) is _Arr
+        assert x.tensor.shape == (2, 4)
+        assert torch.equal(x.tensor, t[0, 1:3])
+
+    def test_full_slice_int_returns_batch_for_fixed_seq_position(self):
+        # [:, j] keeps the whole batch and fixes the seq position -> the _BatchLeaf.
+        t = torch.arange(3 * 4 * 4, dtype=torch.float32).reshape(3, 4, 4)
+        bes = _BatchSeq(t)
+
+        x = bes[:, 2]
+
+        assert type(x) is _BatchLeaf
+        assert torch.equal(x.tensor, t[:, 2])
+
+    def test_partial_slice_int_returns_batch_subrange(self):
+        # [1:, 0] sub-slices the batch and fixes the seq position -> _BatchLeaf (2, n).
+        t = torch.arange(3 * 4 * 4, dtype=torch.float32).reshape(3, 4, 4)
+        bes = _BatchSeq(t)
+
+        x = bes[1:, 0]
+
+        assert type(x) is _BatchLeaf
+        assert x.tensor.shape == (2, 4)
+        assert torch.equal(x.tensor, t[1:, 0])
+
+    def test_full_slice_full_slice_returns_whole_batched_sequence(self):
+        # [:, :] keeps both axes -> a _BatchSeq equal to the entire tensor.
+        t = torch.arange(3 * 4 * 4, dtype=torch.float32).reshape(3, 4, 4)
+        bes = _BatchSeq(t)
+
+        x = bes[:, :]
+
+        assert type(x) is _BatchSeq
+        assert torch.equal(x.tensor, t[:, :])
+
+    def test_partial_slice_partial_slice_returns_batched_sequence_subblock(self):
+        # [0:2, 1:3] sub-slices both axes -> a _BatchSeq subblock of shape (2, 2, n).
+        t = torch.arange(3 * 4 * 4, dtype=torch.float32).reshape(3, 4, 4)
+        bes = _BatchSeq(t)
+
+        x = bes[0:2, 1:3]
+
+        assert type(x) is _BatchSeq
+        assert x.tensor.shape == (2, 2, 4)
+        assert torch.equal(x.tensor, t[0:2, 1:3])
+
+    def test_negative_int_int_returns_last_leaf(self):
+        # Negative ints address from the end on both axes -> the leaf at (-1, -1).
+        t = torch.arange(3 * 4 * 4, dtype=torch.float32).reshape(3, 4, 4)
+        bes = _BatchSeq(t)
+
+        x = bes[-1, -1]
+
+        assert type(x) is _Leaf
+        assert torch.equal(x.tensor, t[-1, -1])
+
+    def test_negative_int_full_slice_returns_last_sequence(self):
+        # A negative batch index with a full seq slice -> the _Arr for the last batch.
+        t = torch.arange(3 * 4 * 4, dtype=torch.float32).reshape(3, 4, 4)
+        bes = _BatchSeq(t)
+
+        x = bes[-1, :]
+
+        assert type(x) is _Arr
+        assert torch.equal(x.tensor, t[-1, :])
+
+    def test_single_slice_still_targets_batch_axis(self):
+        # Backward compat: a lone slice (no tuple) keeps targeting the batch axis
+        # and preserves the _BatchSeq type.
+        t = torch.arange(3 * 4 * 4, dtype=torch.float32).reshape(3, 4, 4)
+        bes = _BatchSeq(t)
+
+        x = bes[1:]
+
+        assert type(x) is _BatchSeq
+        assert torch.equal(x.tensor, t[1:])
 
 
 # --- BatchedElementSequence: stack factories ---------------------------------

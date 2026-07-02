@@ -222,7 +222,7 @@ class BatchedImage(BatchedElement[Image]):
 
 @final
 @attrs.define(slots=True, frozen=True, eq=False)
-class BatchedImageSequence(BatchedElementSequence[BatchedImage, ImageSequence]):
+class BatchedImageSequence(BatchedElementSequence[BatchedImage, ImageSequence, Image]):
     """(batch, len, C, H, W) の画像系列バッチを内包する不変な値オブジェクト。
 
     観測列のバッチをまとめて運ぶための内部表現。batch 軸で個々の ImageSequence を、seq 軸で 個々の
