@@ -168,16 +168,15 @@ class BatchedElementSequence[
             return super().__getitem__(index)
         batch_index, seq_index = index
         selected = self.tensor[batch_index, seq_index]
-        batch_is_slice = isinstance(batch_index, slice)
-        seq_is_slice = isinstance(seq_index, slice)
-        if batch_is_slice and seq_is_slice:
-            return type(self)(selected)
-        if batch_is_slice:  # (slice, int) -> TBatch
-            return self._batch_type()(selected)
-        if seq_is_slice:  # (int, slice) -> TSeq
-            return self.item_type()(selected)
-        # (int, int) -> TElem (leaf)
-        return self.item_type().item_type()(selected)
+        match batch_index, seq_index:
+            case slice(), slice():  # -> Self
+                return type(self)(selected)
+            case slice(), _:  # -> TBatch (batch を slice, seq を固定)
+                return self._batch_type()(selected)
+            case _, slice():  # -> TSeq (batch を固定, seq を slice)
+                return self.item_type()(selected)
+            case _, _:  # -> TElem (leaf)
+                return self.item_type().item_type()(selected)
 
     def iter_batch(self) -> Iterator[TSeq]:
         """Batch 軸(dim=0)を反復し系列 ``TSeq`` を yield する（``__iter__`` と同義）。"""
