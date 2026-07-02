@@ -89,7 +89,7 @@ class ElementArray[T: Element](Element, abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def item_type(cls) -> type[T]:
+    def _item_type(cls) -> type[T]:
         """先頭軸を 1 つ取り出したときに復元する要素型を返す。"""
 
     def __len__(self) -> int:
@@ -102,10 +102,10 @@ class ElementArray[T: Element](Element, abc.ABC):
     def __getitem__(self, index: int | slice) -> T | Self:
         if isinstance(index, slice):
             return type(self)(self.tensor[index])
-        return self.item_type()(self.tensor[index])
+        return self._item_type()(self.tensor[index])
 
     def __iter__(self) -> Iterator[T]:
-        item_type = self.item_type()
+        item_type = self._item_type()
         return (item_type(row) for row in self.tensor)
 
     @classmethod
@@ -174,9 +174,9 @@ class BatchedElementSequence[
             case slice(), _:  # -> TBatch (batch を slice, seq を固定)
                 return self._batch_type()(selected)
             case _, slice():  # -> TSeq (batch を固定, seq を slice)
-                return self.item_type()(selected)
+                return self._item_type()(selected)
             case _, _:  # -> TElem (leaf)
-                return self.item_type().item_type()(selected)
+                return self._item_type()._item_type()(selected)  # pyright: ignore[reportPrivateUsage]
 
     def iter_batch(self) -> Iterator[TSeq]:
         """Batch 軸(dim=0)を反復し系列 ``TSeq`` を yield する（``__iter__`` と同義）。"""

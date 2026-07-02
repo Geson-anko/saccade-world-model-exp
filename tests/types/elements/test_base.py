@@ -14,8 +14,8 @@ The fakes are the "self-owned ABC fakes" the strategy permits; torch
 itself is never mocked. Tensors are built deterministically on real CPU
 torch.
 
-Only public behaviour is asserted. The type hooks ``item_type`` (public)
-and ``_batch_type`` (private) are never called directly: their contract
+Only public behaviour is asserted. The type hooks ``_item_type`` and
+``_batch_type`` (both private) are never called directly: their contract
 is observed through ``__getitem__`` / ``__iter__`` / ``iter_sequence`` /
 the ``from_*`` factories.
 """
@@ -63,7 +63,7 @@ class _Arr(ElementArray[_Leaf]):
 
     @classmethod
     @override
-    def item_type(cls) -> type[_Leaf]:
+    def _item_type(cls) -> type[_Leaf]:
         return _Leaf
 
 
@@ -76,7 +76,7 @@ class _BatchLeaf(BatchedElement[_Leaf]):
 
     @classmethod
     @override
-    def item_type(cls) -> type[_Leaf]:
+    def _item_type(cls) -> type[_Leaf]:
         return _Leaf
 
 
@@ -89,7 +89,7 @@ class _BatchSeq(BatchedElementSequence[_BatchLeaf, _Arr, _Leaf]):
 
     @classmethod
     @override
-    def item_type(cls) -> type[_Arr]:
+    def _item_type(cls) -> type[_Arr]:
         return _Arr
 
     @classmethod

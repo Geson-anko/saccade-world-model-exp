@@ -38,7 +38,7 @@ class LatentSequence(ElementSequence[Latent]):
 
     @classmethod
     @override
-    def item_type(cls) -> type[Latent]:
+    def _item_type(cls) -> type[Latent]:
         return Latent
 
 
@@ -52,7 +52,7 @@ class BatchedLatent(BatchedElement[Latent]):
 
     @classmethod
     @override
-    def item_type(cls) -> type[Latent]:
+    def _item_type(cls) -> type[Latent]:
         return Latent
 
 
@@ -68,7 +68,7 @@ class BatchedLatentSequence(
 
     @classmethod
     @override
-    def item_type(cls) -> type[LatentSequence]:
+    def _item_type(cls) -> type[LatentSequence]:
         return LatentSequence
 
     @classmethod

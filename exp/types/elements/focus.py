@@ -109,7 +109,7 @@ class FocusSequence(_FocusValidation, ElementSequence[Focus]):
 
     @classmethod
     @override
-    def item_type(cls) -> type[Focus]:
+    def _item_type(cls) -> type[Focus]:
         return Focus
 
     def apply(self, image: Image, size: Size2d) -> ImageSequence:
@@ -134,7 +134,7 @@ class BatchedFocus(_FocusValidation, BatchedElement[Focus]):
 
     @classmethod
     @override
-    def item_type(cls) -> type[Focus]:
+    def _item_type(cls) -> type[Focus]:
         return Focus
 
 
@@ -154,7 +154,7 @@ class BatchedFocusSequence(
 
     @classmethod
     @override
-    def item_type(cls) -> type[FocusSequence]:
+    def _item_type(cls) -> type[FocusSequence]:
         return FocusSequence
 
     @classmethod

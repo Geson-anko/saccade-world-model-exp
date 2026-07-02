@@ -199,7 +199,7 @@ class ImageSequence(ElementSequence[Image]):
 
     @classmethod
     @override
-    def item_type(cls) -> type[Image]:
+    def _item_type(cls) -> type[Image]:
         return Image
 
 
@@ -216,7 +216,7 @@ class BatchedImage(BatchedElement[Image]):
 
     @classmethod
     @override
-    def item_type(cls) -> type[Image]:
+    def _item_type(cls) -> type[Image]:
         return Image
 
 
@@ -234,7 +234,7 @@ class BatchedImageSequence(BatchedElementSequence[BatchedImage, ImageSequence, I
 
     @classmethod
     @override
-    def item_type(cls) -> type[ImageSequence]:
+    def _item_type(cls) -> type[ImageSequence]:
         return ImageSequence
 
     @classmethod
