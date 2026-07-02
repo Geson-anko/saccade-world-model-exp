@@ -1,3 +1,9 @@
-from .dataset import GlimpseDataset, collate_glimpses, random_focus_sequence
+from .dataloader import GlimpseDataLoader, collate_glimpses
+from .dataset import GlimpseDataset, random_focus_sequence
 
-__all__ = ["GlimpseDataset", "collate_glimpses", "random_focus_sequence"]
+__all__ = [
+    "GlimpseDataLoader",
+    "GlimpseDataset",
+    "collate_glimpses",
+    "random_focus_sequence",
+]
