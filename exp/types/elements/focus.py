@@ -109,7 +109,7 @@ class FocusSequence(_FocusValidation, ElementSequence[Focus]):
 
     @classmethod
     @override
-    def _item_type(cls) -> type[Focus]:
+    def item_type(cls) -> type[Focus]:
         return Focus
 
     def apply(self, image: Image, size: Size2d) -> ImageSequence:
@@ -134,14 +134,14 @@ class BatchedFocus(_FocusValidation, BatchedElement[Focus]):
 
     @classmethod
     @override
-    def _item_type(cls) -> type[Focus]:
+    def item_type(cls) -> type[Focus]:
         return Focus
 
 
 @final
 @attrs.define(slots=True, frozen=True, eq=False)
 class BatchedFocusSequence(
-    _FocusValidation, BatchedElementSequence[BatchedFocus, FocusSequence]
+    _FocusValidation, BatchedElementSequence[BatchedFocus, FocusSequence, Focus]
 ):
     """(batch, seq, 3) の行動系列バッチを内包する不変な値オブジェクト。
 
@@ -154,7 +154,7 @@ class BatchedFocusSequence(
 
     @classmethod
     @override
-    def _item_type(cls) -> type[FocusSequence]:
+    def item_type(cls) -> type[FocusSequence]:
         return FocusSequence
 
     @classmethod

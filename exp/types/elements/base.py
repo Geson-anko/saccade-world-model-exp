@@ -10,7 +10,7 @@
   - ``ElementArray[T]``   : tensor を先頭 1 軸で積んだ収集型。時系列を表す
     ``ElementSequence`` とバッチを表す ``BatchedElement`` は構造が同一なので本クラス
     のエイリアス（意味は命名で区別する）。
-  - ``BatchedElementSequence[TBatch, TSeq]`` : ``(batch, seq, ...)`` の 2 軸。
+  - ``BatchedElementSequence[TBatch, TSeq, TElem]`` : ``(batch, seq, ...)`` の 2 軸。
     ``iter_batch`` は batch 軸(dim=0)を反復して系列 ``TSeq`` を、``iter_sequence`` は
     seq 軸(dim=1)を反復してバッチ ``TBatch`` を返す。
 
@@ -89,7 +89,7 @@ class ElementArray[T: Element](Element, abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def _item_type(cls) -> type[T]:
+    def item_type(cls) -> type[T]:
         """先頭軸を 1 つ取り出したときに復元する要素型を返す。"""
 
     def __len__(self) -> int:
@@ -102,10 +102,10 @@ class ElementArray[T: Element](Element, abc.ABC):
     def __getitem__(self, index: int | slice) -> T | Self:
         if isinstance(index, slice):
             return type(self)(self.tensor[index])
-        return self._item_type()(self.tensor[index])
+        return self.item_type()(self.tensor[index])
 
     def __iter__(self) -> Iterator[T]:
-        item_type = self._item_type()
+        item_type = self.item_type()
         return (item_type(row) for row in self.tensor)
 
     @classmethod
@@ -130,6 +130,7 @@ BatchedElement = ElementArray
 class BatchedElementSequence[
     TBatch: BatchedElement[Any],
     TSeq: ElementSequence[Any],
+    TElem: Element,
 ](ElementArray[TSeq], abc.ABC):
     """``(batch, seq, ...)`` の 2 軸収集型の基底。
 
@@ -137,12 +138,46 @@ class BatchedElementSequence[
     軸(seq) を反復する ``iter_sequence``（→ ``TBatch``）の 2
     モードを持つ。``__getitem__`` / ``__len__`` は batch
     軸を対象とする（``ElementArray[TSeq]`` から継承）。
+
+    ``__getitem__`` は単一の batch 軸に加えて 2 要素タプル索引も受ける （``[i,j]→TElem`` /
+    ``[i,:]→TSeq`` / ``[:,j]→TBatch`` / ``[:,:]→Self``）。 各軸を int で潰し
+    slice で残すことで復元型が決まる。
     """
 
     @classmethod
     @abc.abstractmethod
     def _batch_type(cls) -> type[TBatch]:
         """Seq 軸を 1 つ取り出したときに復元するバッチ要素型を返す。"""
+
+    @overload
+    def __getitem__(self, index: int) -> TSeq: ...
+    @overload
+    def __getitem__(self, index: slice) -> Self: ...
+    @overload
+    def __getitem__(self, index: tuple[int, int]) -> TElem: ...
+    @overload
+    def __getitem__(self, index: tuple[int, slice]) -> TSeq: ...
+    @overload
+    def __getitem__(self, index: tuple[slice, int]) -> TBatch: ...
+    @overload
+    def __getitem__(self, index: tuple[slice, slice]) -> Self: ...
+    def __getitem__(
+        self, index: int | slice | tuple[int | slice, int | slice]
+    ) -> TElem | TSeq | TBatch | Self:
+        if not isinstance(index, tuple):
+            return super().__getitem__(index)
+        batch_index, seq_index = index
+        selected = self.tensor[batch_index, seq_index]
+        batch_is_slice = isinstance(batch_index, slice)
+        seq_is_slice = isinstance(seq_index, slice)
+        if batch_is_slice and seq_is_slice:
+            return type(self)(selected)
+        if batch_is_slice:  # (slice, int) -> TBatch
+            return self._batch_type()(selected)
+        if seq_is_slice:  # (int, slice) -> TSeq
+            return self.item_type()(selected)
+        # (int, int) -> TElem (leaf)
+        return self.item_type().item_type()(selected)
 
     def iter_batch(self) -> Iterator[TSeq]:
         """Batch 軸(dim=0)を反復し系列 ``TSeq`` を yield する（``__iter__`` と同義）。"""
