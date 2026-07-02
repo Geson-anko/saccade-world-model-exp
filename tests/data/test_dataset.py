@@ -1,11 +1,10 @@
 """Behaviour spec for ``exp.data.dataset``.
 
 These tests translate the approved spec for the glimpse data pipeline
-(``random_focus_sequence`` / ``GlimpseDataset`` / ``collate_glimpses``)
-into executable form. They are written against the *spec*, not any
-implementation: an implementation that diverges should make these red.
-Scenarios are grouped into one class per public function / behaviour
-area.
+(``random_focus_sequence`` / ``GlimpseDataset``) into executable form.
+They are written against the *spec*, not any implementation: an
+implementation that diverges should make these red. Scenarios are
+grouped into one class per public function / behaviour area.
 
 Only the public surface (``from exp.data import ...``) is exercised;
 path collection is verified through ``len`` and determinism, never by
@@ -17,12 +16,9 @@ Randomness is made deterministic via seeded ``torch.Generator``.
 
 import pytest
 import torch
-from torch.utils.data import DataLoader
 
-from exp.data import GlimpseDataset, collate_glimpses, random_focus_sequence
+from exp.data import GlimpseDataset, random_focus_sequence
 from exp.types import (
-    BatchedFocusSequence,
-    BatchedImageSequence,
     FocusSequence,
     ImageSequence,
 )
@@ -203,43 +199,3 @@ class TestGetItem:
 
         assert torch.equal(focuses_a.tensor, focuses_b.tensor)
         assert torch.equal(obs_a.tensor, obs_b.tensor)
-
-
-class TestCollateGlimpses:
-    # integration-real: real image files + real DataLoader.
-
-    def test_stacks_hand_built_batch_on_batch_axis(self, tmp_path):
-        # Two (FocusSequence, ImageSequence) items stack into a batch axis:
-        # (B, S, 3) actions and (B, S, 3, s, s) observations.
-        _write_image(tmp_path / "a.png", seed=1)
-        _write_image(tmp_path / "b.png", seed=2)
-        ds = GlimpseDataset(tmp_path, image_size=8, seq_len=4)
-
-        batch = [ds[0], ds[1]]
-        batched_focuses, batched_observations = collate_glimpses(batch)
-
-        assert type(batched_focuses) is BatchedFocusSequence
-        assert type(batched_observations) is BatchedImageSequence
-        assert batched_focuses.tensor.shape == (2, 4, 3)
-        assert batched_observations.tensor.shape == (2, 4, 3, 8, 8)
-
-    def test_empty_batch_raises_value_error(self):
-        # An empty batch has no sequences to stack (substring match only).
-        with pytest.raises(ValueError, match="at least one"):
-            collate_glimpses([])
-
-    def test_usable_as_dataloader_collate_fn(self, tmp_path):
-        # The whole point of collate_glimpses: a real DataLoader with
-        # batch_size=2 yields the batched value objects with the right shapes.
-        _populated_dir(tmp_path)
-        ds = GlimpseDataset(tmp_path, image_size=8, seq_len=4)
-        loader = DataLoader(
-            ds, batch_size=2, collate_fn=collate_glimpses, num_workers=0
-        )
-
-        batched_focuses, batched_observations = next(iter(loader))
-
-        assert type(batched_focuses) is BatchedFocusSequence
-        assert type(batched_observations) is BatchedImageSequence
-        assert batched_focuses.tensor.shape == (2, 4, 3)
-        assert batched_observations.tensor.shape == (2, 4, 3, 8, 8)
