@@ -58,7 +58,9 @@ class BatchedLatent(BatchedElement[Latent]):
 
 @final
 @attrs.define(slots=True, frozen=True, eq=False)
-class BatchedLatentSequence(BatchedElementSequence[BatchedLatent, LatentSequence]):
+class BatchedLatentSequence(
+    BatchedElementSequence[BatchedLatent, LatentSequence, Latent]
+):
     """(batch, seq, dim) の潜在系列バッチを内包する不変な値オブジェクト。要素 0（空バッチ）も許容する。"""
 
     _NDIM: ClassVar[int] = 3

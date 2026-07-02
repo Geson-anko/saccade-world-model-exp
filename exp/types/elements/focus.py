@@ -141,7 +141,7 @@ class BatchedFocus(_FocusValidation, BatchedElement[Focus]):
 @final
 @attrs.define(slots=True, frozen=True, eq=False)
 class BatchedFocusSequence(
-    _FocusValidation, BatchedElementSequence[BatchedFocus, FocusSequence]
+    _FocusValidation, BatchedElementSequence[BatchedFocus, FocusSequence, Focus]
 ):
     """(batch, seq, 3) の行動系列バッチを内包する不変な値オブジェクト。
 
