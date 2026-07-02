@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import ClassVar, final, override
+from typing import ClassVar, Self, final, override
 
 import attrs
+import torch
 
 from .base import (
     BatchedElement,
@@ -75,3 +76,14 @@ class BatchedLatentSequence(
     @override
     def _batch_type(cls) -> type[BatchedLatent]:
         return BatchedLatent
+
+    def shift(self) -> Self:
+        """Seq 軸(dim=1)を後方へ 1 つずらし、先頭を 0 埋めした新インスタンスを返す。
+
+        ``[e_1, …, e_T]`` → ``[0, e_1, …, e_{T-1}]``（末尾 ``e_T`` は押し出す）。
+        自己回帰の潜在予測で input / target を作るために使う（in-place ではない）。
+        """
+        t = self.tensor
+        shifted = torch.zeros_like(t)
+        shifted[:, 1:] = t[:, :-1]
+        return type(self)(shifted)

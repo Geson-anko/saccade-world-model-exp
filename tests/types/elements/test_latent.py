@@ -686,3 +686,80 @@ class TestBatchedLatentSequenceFromBatches:
         rebuilt = BatchedLatentSequence.from_batches(original.iter_sequence())
 
         assert torch.equal(rebuilt.tensor, original.tensor)
+
+
+class TestBatchedLatentSequenceShift:
+    def test_shifts_sequence_back_by_one_with_zero_prefix(self):
+        # [e_1, …, e_T] -> [0, e_1, …, e_{T-1}]: each seq step moves to the
+        # next index, index 0 becomes zeros, and the last input step e_T is
+        # dropped. Checked per batch row so shifting is confirmed independent
+        # across the batch axis.
+        batch = BatchedLatentSequence(
+            torch.arange(BATCH * SEQ * DIM).reshape(BATCH, SEQ, DIM)
+        )
+
+        result = batch.shift()
+
+        assert result.tensor.shape == (BATCH, SEQ, DIM)
+        for b in range(BATCH):
+            assert torch.equal(result.tensor[b, 0], torch.zeros(DIM, dtype=torch.long))
+            for step in range(1, SEQ):
+                assert torch.equal(result.tensor[b, step], batch.tensor[b, step - 1])
+            # The original last step is pushed out, not present at any index.
+            assert not any(
+                torch.equal(result.tensor[b, step], batch.tensor[b, SEQ - 1])
+                for step in range(SEQ)
+            )
+
+    def test_does_not_mutate_original(self):
+        # shift is non-destructive: it returns a fresh instance and leaves the
+        # source tensor untouched (mirrors the `to` contract).
+        original = BatchedLatentSequence(
+            torch.arange(BATCH * SEQ * DIM).reshape(BATCH, SEQ, DIM)
+        )
+        before = original.tensor.clone()
+
+        result = original.shift()
+
+        assert type(result) is BatchedLatentSequence
+        assert result is not original
+        assert torch.equal(original.tensor, before)
+
+    def test_preserves_dtype(self):
+        batch = BatchedLatentSequence(
+            torch.arange(BATCH * SEQ * DIM).reshape(BATCH, SEQ, DIM).float()
+        )
+
+        result = batch.shift()
+
+        assert result.tensor.dtype == batch.tensor.dtype
+
+    def test_seq_one_becomes_all_zeros(self):
+        # With a single step the sole element is pushed out, leaving only the
+        # zero prefix; shape is preserved.
+        batch = BatchedLatentSequence(
+            torch.arange(BATCH * 1 * DIM).reshape(BATCH, 1, DIM)
+        )
+
+        result = batch.shift()
+
+        assert result.tensor.shape == (BATCH, 1, DIM)
+        assert torch.equal(result.tensor, torch.zeros(BATCH, 1, DIM, dtype=torch.long))
+
+    def test_empty_seq_returns_empty(self):
+        # A (batch, 0, dim) sequence has nothing to shift; it must pass through
+        # without raising and keep its shape.
+        batch = BatchedLatentSequence(torch.zeros(BATCH, 0, DIM))
+
+        result = batch.shift()
+
+        assert result.tensor.shape == (BATCH, 0, DIM)
+
+    def test_empty_batch_returns_empty(self):
+        # A (0, seq, dim) batch has no rows; it must pass through without
+        # raising and keep its shape.
+        batch = BatchedLatentSequence(torch.zeros(0, SEQ, DIM))
+
+        result = batch.shift()
+
+        assert result.tensor.shape == (0, SEQ, DIM)
